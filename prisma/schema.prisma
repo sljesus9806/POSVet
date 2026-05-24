@@ -1,6 +1,5 @@
 // Esquema Prisma - POSVet
-// Módulo: Auth / Usuarios (Fase 1 - MVP)
-// Otros módulos (Productos, Ventas, etc.) se agregarán en sus respectivas branches.
+// Módulos: Auth/Usuarios, Productos, Inventario (Fase 1 - MVP)
 
 generator client {
   provider = "prisma-client-js"
@@ -39,15 +38,19 @@ enum TipoUbicacion {
 }
 
 model Ubicacion {
-  id        String        @id @default(cuid())
-  empresaId String
-  nombre    String
-  tipo      TipoUbicacion
-  direccion String?
-  activa    Boolean       @default(true)
-  empresa   Empresa       @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  id                    String                 @id @default(cuid())
+  empresaId             String
+  nombre                String
+  tipo                  TipoUbicacion
+  direccion             String?
+  activa                Boolean                @default(true)
+  empresa               Empresa                @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  inventarios           Inventario[]
+  movimientos           InventarioMovimiento[]
+  transferenciasOrigen  Transferencia[]        @relation("TransferenciaOrigen")
+  transferenciasDestino Transferencia[]        @relation("TransferenciaDestino")
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
 
   @@index([empresaId])
 }
@@ -57,23 +60,25 @@ model Ubicacion {
 // =====================================================
 
 model Usuario {
-  id               String         @id @default(cuid())
+  id               String                 @id @default(cuid())
   empresaId        String
-  email            String         @unique
+  email            String                 @unique
   nombre           String
   passwordHash     String
-  activo           Boolean        @default(true)
-  twoFactorEnabled Boolean        @default(false)
+  activo           Boolean                @default(true)
+  twoFactorEnabled Boolean                @default(false)
   twoFactorSecret  String?
   ultimoLoginAt    DateTime?
-  intentosFallidos Int            @default(0)
+  intentosFallidos Int                    @default(0)
   bloqueadoHasta   DateTime?
-  empresa          Empresa        @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empresa          Empresa                @relation(fields: [empresaId], references: [id], onDelete: Cascade)
   roles            UsuarioRol[]
   intentosLogin    IntentoLogin[]
   auditLogs        AuditLog[]
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  movimientos      InventarioMovimiento[]
+  transferencias   Transferencia[]
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
 
   @@index([empresaId])
 }
@@ -154,4 +159,194 @@ model AuditLog {
   @@index([fecha])
   @@index([usuarioId])
   @@index([entidad, entidadId])
+}
+
+// =====================================================
+// PRODUCTOS Y CATÁLOGO
+// =====================================================
+
+enum TipoProducto {
+  MEDICAMENTO
+  ALIMENTO
+  ACCESORIO
+  SERVICIO
+}
+
+enum TipoPrecio {
+  PUBLICO
+  MAYOREO
+  VETERINARIO
+}
+
+model Categoria {
+  id          String     @id @default(cuid())
+  nombre      String     @unique
+  descripcion String?
+  activa      Boolean    @default(true)
+  productos   Producto[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Producto {
+  id                  String                 @id @default(cuid())
+  sku                 String                 @unique
+  codigoBarras        String?                @unique
+  nombre              String
+  descripcion         String?
+  marca               String?
+  categoriaId         String?
+  unidadMedida        String // "PZA", "KG", "ML", "DOSIS"
+  tipo                TipoProducto
+  especie             String? // "Canino", "Felino", "Bovino", etc.
+  requiereReceta      Boolean                @default(false)
+  sustanciaControlada Boolean                @default(false)
+  laboratorio         String?
+  viaAdministracion   String?
+  claveSAT            String                 @default("01010101") // clave producto/servicio SAT
+  ivaAplicable        Decimal                @default(0.16) @db.Decimal(5, 4)
+  ultimoCosto         Decimal                @default(0) @db.Decimal(12, 2)
+  costoPromedio       Decimal                @default(0) @db.Decimal(12, 2)
+  activo              Boolean                @default(true)
+  categoria           Categoria?             @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+  precios             ProductoPrecio[]
+  lotes               ProductoLote[]
+  inventarios         Inventario[]
+  movimientos         InventarioMovimiento[]
+  transferenciaLineas TransferenciaLinea[]
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+
+  @@index([categoriaId])
+  @@index([tipo])
+  @@index([activo])
+}
+
+model ProductoPrecio {
+  id         String     @id @default(cuid())
+  productoId String
+  tipo       TipoPrecio
+  precio     Decimal    @db.Decimal(12, 2)
+  producto   Producto   @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@unique([productoId, tipo])
+}
+
+model ProductoLote {
+  id            String                 @id @default(cuid())
+  productoId    String
+  lote          String
+  caducidad     DateTime
+  cantidad      Decimal                @default(0) @db.Decimal(14, 3)
+  costoUnitario Decimal                @db.Decimal(12, 2)
+  producto      Producto               @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  movimientos   InventarioMovimiento[]
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  @@unique([productoId, lote])
+  @@index([caducidad])
+}
+
+// =====================================================
+// INVENTARIO Y KARDEX
+// =====================================================
+
+enum TipoMovimiento {
+  ENTRADA // compra, devolución cliente, ajuste positivo
+  SALIDA // venta, devolución proveedor, ajuste negativo
+  TRANSFERENCIA // movimiento entre ubicaciones
+}
+
+enum MotivoMovimiento {
+  COMPRA
+  VENTA
+  DEVOLUCION_CLIENTE
+  DEVOLUCION_PROVEEDOR
+  AJUSTE_MERMA
+  AJUSTE_CADUCIDAD
+  AJUSTE_ROBO
+  AJUSTE_CONTEO
+  TRANSFERENCIA_SALIDA
+  TRANSFERENCIA_ENTRADA
+  STOCK_INICIAL
+}
+
+enum EstadoTransferencia {
+  PENDIENTE
+  COMPLETADA
+  CANCELADA
+}
+
+model Inventario {
+  id          String    @id @default(cuid())
+  productoId  String
+  ubicacionId String
+  stock       Decimal   @default(0) @db.Decimal(14, 3)
+  stockMinimo Decimal   @default(0) @db.Decimal(14, 3)
+  stockMaximo Decimal?  @db.Decimal(14, 3)
+  producto    Producto  @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  ubicacion   Ubicacion @relation(fields: [ubicacionId], references: [id], onDelete: Cascade)
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([productoId, ubicacionId])
+  @@index([ubicacionId])
+}
+
+model InventarioMovimiento {
+  id              String           @id @default(cuid())
+  productoId      String
+  ubicacionId     String
+  loteId          String?
+  tipo            TipoMovimiento
+  motivo          MotivoMovimiento
+  cantidad        Decimal          @db.Decimal(14, 3) // siempre positiva; tipo define el signo
+  costoUnitario   Decimal?         @db.Decimal(12, 2)
+  stockResultante Decimal          @db.Decimal(14, 3)
+  referenciaTipo  String? // "venta", "transferencia", "ajuste"
+  referenciaId    String?
+  observaciones   String?
+  usuarioId       String
+  fecha           DateTime         @default(now())
+  producto        Producto         @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  ubicacion       Ubicacion        @relation(fields: [ubicacionId], references: [id])
+  lote            ProductoLote?    @relation(fields: [loteId], references: [id], onDelete: SetNull)
+  usuario         Usuario          @relation(fields: [usuarioId], references: [id])
+
+  @@index([productoId, fecha])
+  @@index([ubicacionId, fecha])
+  @@index([referenciaTipo, referenciaId])
+  @@index([fecha])
+}
+
+model Transferencia {
+  id            String               @id @default(cuid())
+  folio         String               @unique // T-2026-00001
+  origenId      String
+  destinoId     String
+  usuarioId     String
+  estado        EstadoTransferencia  @default(PENDIENTE)
+  observaciones String?
+  completadaEn  DateTime?
+  origen        Ubicacion            @relation("TransferenciaOrigen", fields: [origenId], references: [id])
+  destino       Ubicacion            @relation("TransferenciaDestino", fields: [destinoId], references: [id])
+  usuario       Usuario              @relation(fields: [usuarioId], references: [id])
+  lineas        TransferenciaLinea[]
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  @@index([origenId])
+  @@index([destinoId])
+  @@index([estado])
+}
+
+model TransferenciaLinea {
+  id              String        @id @default(cuid())
+  transferenciaId String
+  productoId      String
+  cantidad        Decimal       @db.Decimal(14, 3)
+  transferencia   Transferencia @relation(fields: [transferenciaId], references: [id], onDelete: Cascade)
+  producto        Producto      @relation(fields: [productoId], references: [id])
 }
