@@ -1,0 +1,157 @@
+// Esquema Prisma - POSVet
+// Módulo: Auth / Usuarios (Fase 1 - MVP)
+// Otros módulos (Productos, Ventas, etc.) se agregarán en sus respectivas branches.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =====================================================
+// EMPRESA Y UBICACIONES
+// =====================================================
+
+model Empresa {
+  id            String      @id @default(cuid())
+  rfc           String
+  razonSocial   String
+  regimenFiscal String?
+  codigoPostal  String?
+  direccion     String?
+  email         String?
+  telefono      String?
+  logoUrl       String?
+  activa        Boolean     @default(true)
+  ubicaciones   Ubicacion[]
+  usuarios      Usuario[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+enum TipoUbicacion {
+  TIENDA
+  BODEGA
+  SUCURSAL
+}
+
+model Ubicacion {
+  id        String        @id @default(cuid())
+  empresaId String
+  nombre    String
+  tipo      TipoUbicacion
+  direccion String?
+  activa    Boolean       @default(true)
+  empresa   Empresa       @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([empresaId])
+}
+
+// =====================================================
+// USUARIOS, ROLES Y PERMISOS (RBAC)
+// =====================================================
+
+model Usuario {
+  id               String         @id @default(cuid())
+  empresaId        String
+  email            String         @unique
+  nombre           String
+  passwordHash     String
+  activo           Boolean        @default(true)
+  twoFactorEnabled Boolean        @default(false)
+  twoFactorSecret  String?
+  ultimoLoginAt    DateTime?
+  intentosFallidos Int            @default(0)
+  bloqueadoHasta   DateTime?
+  empresa          Empresa        @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  roles            UsuarioRol[]
+  intentosLogin    IntentoLogin[]
+  auditLogs        AuditLog[]
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@index([empresaId])
+}
+
+model Rol {
+  id          String       @id @default(cuid())
+  codigo      String       @unique // ADMIN, SUPERVISOR, CAJERO, ALMACENISTA, READONLY
+  nombre      String
+  descripcion String?
+  sistema     Boolean      @default(false) // roles del sistema no se pueden eliminar
+  permisos    RolPermiso[]
+  usuarios    UsuarioRol[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Permiso {
+  id          String       @id @default(cuid())
+  codigo      String       @unique // formato: "modulo:accion" ej "ventas:crear"
+  modulo      String // ventas, clientes, productos, etc.
+  accion      String // leer, crear, editar, eliminar, autorizar
+  descripcion String?
+  roles       RolPermiso[]
+
+  @@index([modulo])
+}
+
+model RolPermiso {
+  rolId     String
+  permisoId String
+  rol       Rol     @relation(fields: [rolId], references: [id], onDelete: Cascade)
+  permiso   Permiso @relation(fields: [permisoId], references: [id], onDelete: Cascade)
+
+  @@id([rolId, permisoId])
+}
+
+model UsuarioRol {
+  usuarioId String
+  rolId     String
+  usuario   Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  rol       Rol     @relation(fields: [rolId], references: [id], onDelete: Cascade)
+
+  @@id([usuarioId, rolId])
+}
+
+// =====================================================
+// SEGURIDAD: Intentos de login y bitácora
+// =====================================================
+
+model IntentoLogin {
+  id        String   @id @default(cuid())
+  usuarioId String?
+  email     String // se guarda aunque el usuario no exista (para detectar fuerza bruta)
+  exitoso   Boolean
+  ip        String?
+  userAgent String?
+  fecha     DateTime @default(now())
+  usuario   Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  @@index([email, fecha])
+  @@index([fecha])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  usuarioId String?
+  modulo    String
+  accion    String
+  entidad   String // "venta", "producto", "usuario", etc.
+  entidadId String?
+  antes     Json?
+  despues   Json?
+  ip        String?
+  userAgent String?
+  fecha     DateTime @default(now())
+  usuario   Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  @@index([fecha])
+  @@index([usuarioId])
+  @@index([entidad, entidadId])
+}
