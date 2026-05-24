@@ -219,6 +219,229 @@ async function main() {
     });
   }
 
+  console.log("→ Categorías base");
+  const categorias = [
+    { nombre: "Antibióticos", descripcion: "Medicamentos antibióticos veterinarios" },
+    { nombre: "Antiparasitarios", descripcion: "Desparasitantes internos y externos" },
+    { nombre: "Alimento canino", descripcion: "Alimentos para perros" },
+    { nombre: "Alimento felino", descripcion: "Alimentos para gatos" },
+    { nombre: "Accesorios", descripcion: "Collares, juguetes, transportadoras" },
+    { nombre: "Servicios", descripcion: "Servicios veterinarios" },
+  ];
+  for (const c of categorias) {
+    await prisma.categoria.upsert({
+      where: { nombre: c.nombre },
+      update: { descripcion: c.descripcion },
+      create: c,
+    });
+  }
+
+  console.log("→ Productos demo");
+  const catAntibioticos = await prisma.categoria.findUnique({ where: { nombre: "Antibióticos" } });
+  const catAntipara = await prisma.categoria.findUnique({ where: { nombre: "Antiparasitarios" } });
+  const catCanino = await prisma.categoria.findUnique({ where: { nombre: "Alimento canino" } });
+  const catFelino = await prisma.categoria.findUnique({ where: { nombre: "Alimento felino" } });
+  const catAccesorios = await prisma.categoria.findUnique({ where: { nombre: "Accesorios" } });
+
+  type SeedProducto = {
+    sku: string;
+    nombre: string;
+    tipo: "MEDICAMENTO" | "ALIMENTO" | "ACCESORIO" | "SERVICIO";
+    unidadMedida: string;
+    categoriaId?: string;
+    especie?: string;
+    marca?: string;
+    laboratorio?: string;
+    requiereReceta?: boolean;
+    costo: number;
+    precios: Array<{ tipo: "PUBLICO" | "MAYOREO" | "VETERINARIO"; precio: number }>;
+    lote?: { lote: string; caducidad: Date; cantidad: number };
+    stockTienda: number;
+    stockBodega: number;
+  };
+
+  const en12meses = new Date();
+  en12meses.setMonth(en12meses.getMonth() + 12);
+
+  const productos: SeedProducto[] = [
+    {
+      sku: "MED-AMOX-500",
+      nombre: "Amoxicilina 500mg (caja 10 tabletas)",
+      tipo: "MEDICAMENTO",
+      unidadMedida: "CAJA",
+      categoriaId: catAntibioticos?.id,
+      especie: "Canino",
+      laboratorio: "Bayer",
+      requiereReceta: true,
+      costo: 85,
+      precios: [
+        { tipo: "PUBLICO", precio: 150 },
+        { tipo: "VETERINARIO", precio: 120 },
+      ],
+      lote: { lote: "L2026-001", caducidad: en12meses, cantidad: 50 },
+      stockTienda: 30,
+      stockBodega: 20,
+    },
+    {
+      sku: "MED-IVER-10",
+      nombre: "Ivermectina 1% inyectable 10ml",
+      tipo: "MEDICAMENTO",
+      unidadMedida: "FRASCO",
+      categoriaId: catAntipara?.id,
+      laboratorio: "Zoetis",
+      requiereReceta: true,
+      costo: 110,
+      precios: [
+        { tipo: "PUBLICO", precio: 190 },
+        { tipo: "VETERINARIO", precio: 155 },
+      ],
+      lote: { lote: "L2026-002", caducidad: en12meses, cantidad: 40 },
+      stockTienda: 15,
+      stockBodega: 25,
+    },
+    {
+      sku: "ALI-CAN-15K",
+      nombre: "Alimento canino adulto 15kg",
+      tipo: "ALIMENTO",
+      unidadMedida: "BULTO",
+      categoriaId: catCanino?.id,
+      marca: "Royal Canin",
+      especie: "Canino",
+      costo: 620,
+      precios: [
+        { tipo: "PUBLICO", precio: 890 },
+        { tipo: "MAYOREO", precio: 820 },
+      ],
+      lote: { lote: "L2026-A01", caducidad: en12meses, cantidad: 20 },
+      stockTienda: 8,
+      stockBodega: 12,
+    },
+    {
+      sku: "ALI-FEL-7K",
+      nombre: "Alimento felino adulto 7kg",
+      tipo: "ALIMENTO",
+      unidadMedida: "BULTO",
+      categoriaId: catFelino?.id,
+      marca: "Whiskas",
+      especie: "Felino",
+      costo: 380,
+      precios: [
+        { tipo: "PUBLICO", precio: 540 },
+        { tipo: "MAYOREO", precio: 495 },
+      ],
+      lote: { lote: "L2026-A02", caducidad: en12meses, cantidad: 15 },
+      stockTienda: 6,
+      stockBodega: 9,
+    },
+    {
+      sku: "ACC-COL-M",
+      nombre: "Collar ajustable mediano",
+      tipo: "ACCESORIO",
+      unidadMedida: "PZA",
+      categoriaId: catAccesorios?.id,
+      costo: 45,
+      precios: [
+        { tipo: "PUBLICO", precio: 95 },
+        { tipo: "MAYOREO", precio: 75 },
+      ],
+      stockTienda: 25,
+      stockBodega: 50,
+    },
+  ];
+
+  for (const p of productos) {
+    const prod = await prisma.producto.upsert({
+      where: { sku: p.sku },
+      update: {
+        nombre: p.nombre,
+        categoriaId: p.categoriaId ?? null,
+        marca: p.marca ?? null,
+        laboratorio: p.laboratorio ?? null,
+        especie: p.especie ?? null,
+        ultimoCosto: p.costo,
+        costoPromedio: p.costo,
+      },
+      create: {
+        sku: p.sku,
+        nombre: p.nombre,
+        tipo: p.tipo,
+        unidadMedida: p.unidadMedida,
+        categoriaId: p.categoriaId ?? null,
+        marca: p.marca ?? null,
+        laboratorio: p.laboratorio ?? null,
+        especie: p.especie ?? null,
+        requiereReceta: p.requiereReceta ?? false,
+        ultimoCosto: p.costo,
+        costoPromedio: p.costo,
+      },
+    });
+
+    for (const precio of p.precios) {
+      await prisma.productoPrecio.upsert({
+        where: { productoId_tipo: { productoId: prod.id, tipo: precio.tipo } },
+        update: { precio: precio.precio },
+        create: { productoId: prod.id, tipo: precio.tipo, precio: precio.precio },
+      });
+    }
+
+    let loteId: string | null = null;
+    if (p.lote) {
+      const lote = await prisma.productoLote.upsert({
+        where: { productoId_lote: { productoId: prod.id, lote: p.lote.lote } },
+        update: { caducidad: p.lote.caducidad, cantidad: p.lote.cantidad, costoUnitario: p.costo },
+        create: {
+          productoId: prod.id,
+          lote: p.lote.lote,
+          caducidad: p.lote.caducidad,
+          cantidad: p.lote.cantidad,
+          costoUnitario: p.costo,
+        },
+      });
+      loteId = lote.id;
+    }
+
+    const ubicaciones = [
+      { id: "ubicacion-tienda", stock: p.stockTienda },
+      { id: "ubicacion-bodega", stock: p.stockBodega },
+    ];
+    for (const u of ubicaciones) {
+      const inv = await prisma.inventario.upsert({
+        where: { productoId_ubicacionId: { productoId: prod.id, ubicacionId: u.id } },
+        update: { stock: u.stock, stockMinimo: 5 },
+        create: {
+          productoId: prod.id,
+          ubicacionId: u.id,
+          stock: u.stock,
+          stockMinimo: 5,
+        },
+      });
+      // Movimiento STOCK_INICIAL idempotente: solo lo creamos una vez por inventario.
+      const yaExiste = await prisma.inventarioMovimiento.findFirst({
+        where: {
+          productoId: prod.id,
+          ubicacionId: u.id,
+          motivo: "STOCK_INICIAL",
+        },
+      });
+      if (!yaExiste && u.stock > 0) {
+        await prisma.inventarioMovimiento.create({
+          data: {
+            productoId: prod.id,
+            ubicacionId: u.id,
+            loteId,
+            tipo: "ENTRADA",
+            motivo: "STOCK_INICIAL",
+            cantidad: u.stock,
+            costoUnitario: p.costo,
+            stockResultante: inv.stock,
+            usuarioId: usuario.id,
+            observaciones: "Stock inicial de seed",
+          },
+        });
+      }
+    }
+  }
+
   console.log(`\n✓ Seed completo.`);
   console.log(`  Admin: ${adminEmail}  /  ${adminPassword}`);
 }
