@@ -22,7 +22,7 @@ const NAV = [
   { href: "/clientes", label: "Clientes", icon: Users },
   { href: "/productos", label: "Productos", icon: Package },
   { href: "/inventario", label: "Inventario", icon: Boxes },
-  { href: "/proveedores", label: "Proveedores", icon: Truck, disabled: true },
+  { href: "/proveedores", label: "Proveedores", icon: Truck },
   { href: "/facturacion", label: "Facturación", icon: FileText, disabled: true },
   { href: "/reportes", label: "Reportes", icon: BarChart3 },
   { href: "/configuracion", label: "Configuración", icon: Settings, disabled: true },
