@@ -19,7 +19,7 @@ import {
 const NAV = [
   { href: "/dashboard", label: "Inicio", icon: LayoutDashboard },
   { href: "/ventas", label: "Ventas", icon: ShoppingCart, disabled: true },
-  { href: "/clientes", label: "Clientes", icon: Users, disabled: true },
+  { href: "/clientes", label: "Clientes", icon: Users },
   { href: "/productos", label: "Productos", icon: Package },
   { href: "/inventario", label: "Inventario", icon: Boxes },
   { href: "/proveedores", label: "Proveedores", icon: Truck, disabled: true },

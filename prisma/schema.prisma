@@ -350,3 +350,42 @@ model TransferenciaLinea {
   transferencia   Transferencia @relation(fields: [transferenciaId], references: [id], onDelete: Cascade)
   producto        Producto      @relation(fields: [productoId], references: [id])
 }
+
+// =====================================================
+// CLIENTES
+// =====================================================
+
+enum TipoCliente {
+  PUBLICO
+  MAYOREO
+  VETERINARIO
+  GRANJA
+}
+
+model Cliente {
+  id            String      @id @default(cuid())
+  codigo        String      @unique // CLI-00001
+  nombre        String
+  rfc           String?
+  regimenFiscal String?
+  usoCFDI       String?
+  codigoPostal  String?
+  email         String?
+  telefono      String?
+  notas         String?
+  tipoCliente   TipoCliente @default(PUBLICO)
+  // Override opcional del tipo de precio. Si null, se deriva de tipoCliente.
+  tipoPrecio    TipoPrecio?
+  // Campos reservados para Fase 2 (crédito y cobranza). Default 0, sin uso aún.
+  lineaCredito  Decimal     @default(0) @db.Decimal(12, 2)
+  diasCredito   Int         @default(0)
+  saldoActual   Decimal     @default(0) @db.Decimal(12, 2)
+  activo        Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([nombre])
+  @@index([rfc])
+  @@index([tipoCliente])
+  @@index([activo])
+}
