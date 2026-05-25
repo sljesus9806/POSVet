@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+// IDs internos: vienen de selects poblados por el servidor o validados por FK de Postgres.
+// No usamos .cuid() porque el seed de dev usa IDs legibles (ej. "ubicacion-tienda").
+const idSchema = z.string().min(1, "ID requerido");
+const idOpcionalSchema = idSchema.optional().or(z.literal("").transform(() => undefined));
+
 export const motivoAjusteSchema = z.enum([
   "AJUSTE_MERMA",
   "AJUSTE_CADUCIDAD",
@@ -9,9 +14,9 @@ export const motivoAjusteSchema = z.enum([
 
 export const ajustarStockSchema = z
   .object({
-    productoId: z.string().cuid(),
-    ubicacionId: z.string().cuid(),
-    loteId: z.string().cuid().optional().or(z.literal("").transform(() => undefined)),
+    productoId: idSchema,
+    ubicacionId: idSchema,
+    loteId: idOpcionalSchema,
     delta: z.number().refine((v) => v !== 0, "El delta no puede ser cero"),
     motivo: motivoAjusteSchema,
     observaciones: z.string().trim().max(500).optional(),
@@ -19,21 +24,21 @@ export const ajustarStockSchema = z
   .strict();
 
 export const definirStockMinimoSchema = z.object({
-  productoId: z.string().cuid(),
-  ubicacionId: z.string().cuid(),
+  productoId: idSchema,
+  ubicacionId: idSchema,
   stockMinimo: z.number().nonnegative(),
   stockMaximo: z.number().nonnegative().nullable().optional(),
 });
 
 export const transferenciaLineaSchema = z.object({
-  productoId: z.string().cuid(),
+  productoId: idSchema,
   cantidad: z.number().positive(),
 });
 
 export const crearTransferenciaSchema = z
   .object({
-    origenId: z.string().cuid(),
-    destinoId: z.string().cuid(),
+    origenId: idSchema,
+    destinoId: idSchema,
     observaciones: z.string().trim().max(500).optional(),
     lineas: z.array(transferenciaLineaSchema).min(1, "Debe incluir al menos una línea"),
   })
@@ -43,11 +48,11 @@ export const crearTransferenciaSchema = z
   });
 
 export const registrarEntradaSchema = z.object({
-  productoId: z.string().cuid(),
-  ubicacionId: z.string().cuid(),
+  productoId: idSchema,
+  ubicacionId: idSchema,
   cantidad: z.number().positive(),
   costoUnitario: z.number().nonnegative(),
-  loteId: z.string().cuid().optional().or(z.literal("").transform(() => undefined)),
+  loteId: idOpcionalSchema,
   observaciones: z.string().trim().max(500).optional(),
 });
 

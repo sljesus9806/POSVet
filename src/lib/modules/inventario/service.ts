@@ -430,6 +430,115 @@ export const inventarioService = {
     }));
   },
 
+  /**
+   * Descuenta stock como SALIDA por venta dentro de una transacción provista por el
+   * caller. Devuelve los datos necesarios para que el caller dispare alertas de
+   * bajo stock DESPUÉS del commit. No emite eventos por sí misma (la atomicidad
+   * de la venta requiere que el caller controle el commit).
+   *
+   * Lanza StockInsuficienteError si la cantidad excede el stock disponible.
+   */
+  async aplicarSalidaPorVenta(
+    tx: Prisma.TransactionClient,
+    params: {
+      productoId: string;
+      ubicacionId: string;
+      loteId?: string | null;
+      cantidad: number;
+      ventaId: string;
+      usuarioId: string;
+      folioVenta: string;
+    },
+  ) {
+    const inv = await tx.inventario.findUnique({
+      where: { productoId_ubicacionId: { productoId: params.productoId, ubicacionId: params.ubicacionId } },
+    });
+    const stockActual = inv ? new D(inv.stock.toString()) : new D(0);
+    if (stockActual.lt(params.cantidad)) {
+      throw new StockInsuficienteError(
+        params.productoId,
+        params.ubicacionId,
+        Number(new D(params.cantidad).minus(stockActual).toString()),
+      );
+    }
+    const nuevoStock = stockActual.minus(params.cantidad);
+
+    const invActualizado = inv
+      ? await tx.inventario.update({ where: { id: inv.id }, data: { stock: nuevoStock } })
+      : await tx.inventario.create({
+          data: { productoId: params.productoId, ubicacionId: params.ubicacionId, stock: nuevoStock, stockMinimo: 0 },
+        });
+
+    const mov = await tx.inventarioMovimiento.create({
+      data: {
+        productoId: params.productoId,
+        ubicacionId: params.ubicacionId,
+        loteId: params.loteId ?? null,
+        tipo: "SALIDA",
+        motivo: "VENTA",
+        cantidad: params.cantidad,
+        stockResultante: nuevoStock,
+        usuarioId: params.usuarioId,
+        referenciaTipo: "venta",
+        referenciaId: params.ventaId,
+        observaciones: `Venta ${params.folioVenta}`,
+      },
+    });
+
+    const stockResultante = Number(nuevoStock.toString());
+    const minimo = toNumber(invActualizado.stockMinimo);
+    return {
+      movimientoId: mov.id,
+      stockResultante,
+      bajoMinimo: minimo > 0 && stockResultante <= minimo,
+      stockMinimo: minimo,
+    };
+  },
+
+  /**
+   * Restaura stock por cancelación de venta. Misma convención que aplicarSalidaPorVenta.
+   */
+  async aplicarEntradaPorCancelacionVenta(
+    tx: Prisma.TransactionClient,
+    params: {
+      productoId: string;
+      ubicacionId: string;
+      loteId?: string | null;
+      cantidad: number;
+      ventaId: string;
+      usuarioId: string;
+      folioVenta: string;
+    },
+  ) {
+    const inv = await obtenerOCrearInventario(tx, params.productoId, params.ubicacionId);
+    const nuevoStock = new D(inv.stock.toString()).plus(params.cantidad);
+    await tx.inventario.update({ where: { id: inv.id }, data: { stock: nuevoStock } });
+    const mov = await tx.inventarioMovimiento.create({
+      data: {
+        productoId: params.productoId,
+        ubicacionId: params.ubicacionId,
+        loteId: params.loteId ?? null,
+        tipo: "ENTRADA",
+        motivo: "DEVOLUCION_CLIENTE",
+        cantidad: params.cantidad,
+        stockResultante: nuevoStock,
+        usuarioId: params.usuarioId,
+        referenciaTipo: "venta_cancelada",
+        referenciaId: params.ventaId,
+        observaciones: `Cancelación venta ${params.folioVenta}`,
+      },
+    });
+    return { movimientoId: mov.id, stockResultante: Number(nuevoStock.toString()) };
+  },
+
+  // Emite las notificaciones de bajo stock detectadas durante una operación
+  // transaccional ya commiteada. Pensado para usarse después de aplicarSalidaPorVenta.
+  async notificarBajoStock(items: Array<{ productoId: string; ubicacionId: string; stock: number; stockMinimo: number }>) {
+    for (const it of items) {
+      await eventBus.emit(INVENTARIO_EVENTS.BAJO_STOCK, it);
+    }
+  },
+
   async alertasBajoStock(): Promise<AlertaBajoStock[]> {
     const filas = await inventarioRepository.listarBajoStock();
     return filas.map((f) => ({

@@ -1,5 +1,11 @@
 // API pública del módulo Inventario.
 
+// Nota: inventarioService expone `aplicarSalidaPorVenta` y
+// `aplicarEntradaPorCancelacionVenta` que reciben una `Prisma.TransactionClient`
+// del caller. Esto permite al módulo de ventas descontar/restaurar stock dentro
+// de su misma transacción, garantizando atomicidad (la venta y su movimiento de
+// kardex comparten commit). Es preferible a un listener asíncrono sobre el
+// event-bus, que no es transaccional.
 export {
   inventarioService,
   StockInsuficienteError,
