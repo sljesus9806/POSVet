@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/modules/shared/db";
 import { ventasService } from "@/lib/modules/ventas";
 import { requirePermission } from "@/lib/auth-helpers";
-import { PrintTrigger } from "./print-trigger";
+import { PrintTrigger, PrintButton } from "./print-trigger";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n);
@@ -116,13 +116,7 @@ export default async function TicketPage({ params }: { params: Params }) {
         </footer>
 
         <div className="no-print mt-4 text-center">
-          <button
-            type="button"
-            onClick={() => window.print()}
-            className="border px-3 py-1 rounded text-xs"
-          >
-            Imprimir
-          </button>
+          <PrintButton />
         </div>
       </div>
       <style>{`

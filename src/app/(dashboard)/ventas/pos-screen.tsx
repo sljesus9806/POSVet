@@ -332,10 +332,11 @@ export function POSScreen({
               className="pl-9"
             />
           </div>
-          <p className="text-xs text-muted-foreground">
-            Lista de precios aplicada: <Badge variant="secondary">{tipoPrecio}</Badge>{" "}
+          <div className="text-xs text-muted-foreground flex items-center gap-1">
+            <span>Lista de precios aplicada:</span>
+            <Badge variant="secondary">{tipoPrecio}</Badge>
             {buscandoProductos && <span className="ml-2">buscando…</span>}
-          </p>
+          </div>
         </div>
 
         <div className="bg-card rounded-lg border max-h-[600px] overflow-y-auto divide-y">

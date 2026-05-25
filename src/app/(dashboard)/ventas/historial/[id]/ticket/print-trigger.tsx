@@ -9,3 +9,15 @@ export function PrintTrigger() {
   }, []);
   return null;
 }
+
+export function PrintButton() {
+  return (
+    <button
+      type="button"
+      onClick={() => window.print()}
+      className="border px-3 py-1 rounded text-xs"
+    >
+      Imprimir
+    </button>
+  );
+}
