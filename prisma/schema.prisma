@@ -1,5 +1,5 @@
 // Esquema Prisma - POSVet
-// Módulos: Auth/Usuarios, Productos, Inventario (Fase 1 - MVP)
+// Módulos: Auth/Usuarios, Productos, Inventario, Clientes, Ventas (Fase 1 - MVP)
 
 generator client {
   provider = "prisma-client-js"
@@ -49,6 +49,8 @@ model Ubicacion {
   movimientos           InventarioMovimiento[]
   transferenciasOrigen  Transferencia[]        @relation("TransferenciaOrigen")
   transferenciasDestino Transferencia[]        @relation("TransferenciaDestino")
+  cajas                 Caja[]
+  ventas                Venta[]
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
 
@@ -77,6 +79,10 @@ model Usuario {
   auditLogs        AuditLog[]
   movimientos      InventarioMovimiento[]
   transferencias   Transferencia[]
+  cajasAbiertas    Caja[]                 @relation("CajaAbiertaPor")
+  cajasCerradas    Caja[]                 @relation("CajaCerradaPor")
+  ventas           Venta[]                @relation("VentaUsuario")
+  ventasCanceladas Venta[]                @relation("VentaCanceladaPor")
   createdAt        DateTime               @default(now())
   updatedAt        DateTime               @updatedAt
 
@@ -214,6 +220,7 @@ model Producto {
   inventarios         Inventario[]
   movimientos         InventarioMovimiento[]
   transferenciaLineas TransferenciaLinea[]
+  ventaLineas         VentaLinea[]
   createdAt           DateTime               @default(now())
   updatedAt           DateTime               @updatedAt
 
@@ -243,6 +250,7 @@ model ProductoLote {
   costoUnitario Decimal                @db.Decimal(12, 2)
   producto      Producto               @relation(fields: [productoId], references: [id], onDelete: Cascade)
   movimientos   InventarioMovimiento[]
+  ventaLineas   VentaLinea[]
   createdAt     DateTime               @default(now())
   updatedAt     DateTime               @updatedAt
 
@@ -381,6 +389,7 @@ model Cliente {
   diasCredito   Int         @default(0)
   saldoActual   Decimal     @default(0) @db.Decimal(12, 2)
   activo        Boolean     @default(true)
+  ventas        Venta[]
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
@@ -388,4 +397,128 @@ model Cliente {
   @@index([rfc])
   @@index([tipoCliente])
   @@index([activo])
+}
+
+// =====================================================
+// VENTAS Y CAJA
+// =====================================================
+
+enum EstadoCaja {
+  ABIERTA
+  CERRADA
+}
+
+enum EstadoVenta {
+  COMPLETADA
+  CANCELADA
+}
+
+enum FormaPago {
+  EFECTIVO
+  TARJETA
+  TRANSFERENCIA
+  CREDITO
+}
+
+model Caja {
+  id                     String       @id @default(cuid())
+  folio                  String       @unique // C-YYYY-NNNNN
+  ubicacionId            String
+  abiertaPorId           String
+  cerradaPorId           String?
+  estado                 EstadoCaja   @default(ABIERTA)
+  fondoInicial           Decimal      @default(0) @db.Decimal(12, 2)
+  montoEsperadoEfectivo  Decimal?     @db.Decimal(12, 2) // calculado al cierre
+  montoContadoEfectivo   Decimal?     @db.Decimal(12, 2) // capturado por el cajero
+  diferenciaEfectivo     Decimal?     @db.Decimal(12, 2)
+  totalVendido           Decimal      @default(0) @db.Decimal(12, 2)
+  observacionesApertura  String?
+  observacionesCierre    String?
+  abiertaEn              DateTime     @default(now())
+  cerradaEn              DateTime?
+  ubicacion              Ubicacion    @relation(fields: [ubicacionId], references: [id])
+  abiertaPor             Usuario      @relation("CajaAbiertaPor", fields: [abiertaPorId], references: [id])
+  cerradaPor             Usuario?     @relation("CajaCerradaPor", fields: [cerradaPorId], references: [id])
+  ventas                 Venta[]
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+
+  @@index([ubicacionId, estado])
+  @@index([abiertaPorId, estado])
+  @@index([abiertaEn])
+}
+
+model Venta {
+  id                  String       @id @default(cuid())
+  folio               String       @unique // V-YYYY-NNNNNN
+  cajaId              String
+  ubicacionId         String
+  usuarioId           String
+  clienteId           String?
+  estado              EstadoVenta  @default(COMPLETADA)
+  tipoPrecio          TipoPrecio   @default(PUBLICO)
+  subtotal            Decimal      @default(0) @db.Decimal(12, 2) // suma de líneas sin IVA, después de descuento
+  descuentoLineas     Decimal      @default(0) @db.Decimal(12, 2) // suma de descuentos por línea
+  descuentoGlobal     Decimal      @default(0) @db.Decimal(12, 2)
+  iva                 Decimal      @default(0) @db.Decimal(12, 2)
+  total               Decimal      @default(0) @db.Decimal(12, 2)
+  totalPagado         Decimal      @default(0) @db.Decimal(12, 2)
+  cambio              Decimal      @default(0) @db.Decimal(12, 2)
+  observaciones       String?
+  motivoCancelacion   String?
+  canceladaPorId      String?
+  canceladaEn         DateTime?
+  fechaVenta          DateTime     @default(now())
+  caja                Caja         @relation(fields: [cajaId], references: [id])
+  ubicacion           Ubicacion    @relation(fields: [ubicacionId], references: [id])
+  usuario             Usuario      @relation("VentaUsuario", fields: [usuarioId], references: [id])
+  canceladaPor        Usuario?     @relation("VentaCanceladaPor", fields: [canceladaPorId], references: [id])
+  cliente             Cliente?     @relation(fields: [clienteId], references: [id])
+  lineas              VentaLinea[]
+  pagos               VentaPago[]
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  @@index([cajaId])
+  @@index([ubicacionId, fechaVenta])
+  @@index([usuarioId, fechaVenta])
+  @@index([clienteId])
+  @@index([estado])
+  @@index([fechaVenta])
+}
+
+model VentaLinea {
+  id              String        @id @default(cuid())
+  ventaId         String
+  productoId      String
+  loteId          String?
+  // Snapshot del producto al momento de la venta (no se altera si cambia el catálogo)
+  productoSku     String
+  productoNombre  String
+  unidadMedida    String
+  cantidad        Decimal       @db.Decimal(14, 3)
+  precioUnitario  Decimal       @db.Decimal(12, 2)
+  descuento       Decimal       @default(0) @db.Decimal(12, 2) // importe absoluto de descuento de la línea
+  subtotal        Decimal       @db.Decimal(12, 2) // (precio*cant) - descuento, sin IVA
+  ivaTasa         Decimal       @default(0) @db.Decimal(5, 4)
+  ivaImporte      Decimal       @default(0) @db.Decimal(12, 2)
+  total           Decimal       @db.Decimal(12, 2)
+  venta           Venta         @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  producto        Producto      @relation(fields: [productoId], references: [id])
+  lote            ProductoLote? @relation(fields: [loteId], references: [id], onDelete: SetNull)
+
+  @@index([ventaId])
+  @@index([productoId])
+}
+
+model VentaPago {
+  id         String    @id @default(cuid())
+  ventaId    String
+  forma      FormaPago
+  monto      Decimal   @db.Decimal(12, 2)
+  referencia String? // últimos 4, autorización, folio de transferencia
+  venta      Venta     @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+
+  @@index([ventaId])
+  @@index([forma])
 }
