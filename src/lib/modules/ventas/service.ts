@@ -1,5 +1,5 @@
 import { Prisma } from "@prisma/client";
-import { prisma } from "../shared/db";
+import { prisma, TX_OPTS } from "../shared/db";
 import { eventBus } from "../shared/event-bus";
 import { audit } from "../shared/audit";
 import { tipoPrecioEfectivo } from "../clientes";
@@ -220,7 +220,7 @@ export const ventasService = {
           cerradaPor: { select: { id: true, nombre: true } },
         },
       });
-    });
+    }, TX_OPTS);
 
     await audit({
       usuarioId: ctx.usuarioId,
@@ -515,7 +515,7 @@ export const ventasService = {
         }
       }
       return { venta: v, alertasBajoStock: alertas };
-    });
+    }, TX_OPTS);
 
     await audit({
       usuarioId: ctx.usuarioId,
@@ -602,7 +602,7 @@ export const ventasService = {
         });
       }
       return v;
-    });
+    }, TX_OPTS);
 
     await audit({
       usuarioId: ctx.usuarioId,
