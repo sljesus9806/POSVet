@@ -86,6 +86,8 @@ export default async function VentasPage() {
           tipoCliente: c.tipoCliente,
           tipoPrecioEfectivo: c.tipoPrecioEfectivo,
           rfc: c.rfc,
+          lineaCredito: c.lineaCredito,
+          saldoActual: c.saldoActual,
         }))}
         productosIniciales={productos}
       />

@@ -21,7 +21,7 @@ function formatZod(err: z.ZodError): FormState {
   };
 }
 
-function pick(formData: FormData): Record<string, string> {
+function pick(formData: FormData): Record<string, unknown> {
   const keys = [
     "nombre",
     "rfc",
@@ -34,8 +34,12 @@ function pick(formData: FormData): Record<string, string> {
     "tipoCliente",
     "tipoPrecio",
   ];
-  const out: Record<string, string> = {};
+  const out: Record<string, unknown> = {};
   for (const k of keys) out[k] = String(formData.get(k) ?? "");
+  const linea = formData.get("lineaCredito");
+  if (linea != null && String(linea).length > 0) out.lineaCredito = Number(linea);
+  const dias = formData.get("diasCredito");
+  if (dias != null && String(dias).length > 0) out.diasCredito = Number(dias);
   return out;
 }
 

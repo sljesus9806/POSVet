@@ -162,6 +162,48 @@ export function ClienteForm({ cliente }: { cliente?: ClienteDetalle }) {
       </section>
 
       <section className="rounded-lg border bg-card p-5 space-y-4">
+        <h3 className="font-semibold">Crédito</h3>
+        <p className="text-xs text-muted-foreground">
+          Línea de crédito autorizada. Si es 0, este cliente no podrá pagar a crédito en el POS.
+          {isEdit && (
+            <>
+              {" "}Saldo actual del cliente:{" "}
+              <strong className="tabular-nums">
+                {new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(cliente?.saldoActual ?? 0)}
+              </strong>
+              {" "}(no se edita directamente; cambia con ventas a crédito y abonos).
+            </>
+          )}
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <Label htmlFor="lineaCredito">Línea de crédito</Label>
+            <Input
+              id="lineaCredito"
+              name="lineaCredito"
+              type="number"
+              step="0.01"
+              min={0}
+              defaultValue={cliente?.lineaCredito ?? 0}
+            />
+            <Err msgs={state.fieldErrors?.lineaCredito} />
+          </div>
+          <div>
+            <Label htmlFor="diasCredito">Días de crédito</Label>
+            <Input
+              id="diasCredito"
+              name="diasCredito"
+              type="number"
+              min={0}
+              max={365}
+              defaultValue={cliente?.diasCredito ?? 0}
+            />
+            <Err msgs={state.fieldErrors?.diasCredito} />
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-lg border bg-card p-5 space-y-4">
         <h3 className="font-semibold">Notas internas</h3>
         <Textarea
           id="notas"

@@ -16,12 +16,14 @@ import {
   Boxes,
   ClipboardList,
   Wallet,
+  HandCoins,
 } from "lucide-react";
 
 const NAV = [
   { href: "/dashboard", label: "Inicio", icon: LayoutDashboard },
   { href: "/ventas", label: "Ventas", icon: ShoppingCart },
   { href: "/clientes", label: "Clientes", icon: Users },
+  { href: "/cobranza", label: "Cobranza", icon: HandCoins },
   { href: "/productos", label: "Productos", icon: Package },
   { href: "/inventario", label: "Inventario", icon: Boxes },
   { href: "/proveedores", label: "Proveedores", icon: Truck },
