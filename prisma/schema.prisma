@@ -51,6 +51,8 @@ model Ubicacion {
   transferenciasDestino Transferencia[]        @relation("TransferenciaDestino")
   cajas                 Caja[]
   ventas                Venta[]
+  ordenesCompra         OrdenCompra[]
+  recepciones           RecepcionMercancia[]
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
 
@@ -83,6 +85,9 @@ model Usuario {
   cajasCerradas    Caja[]                 @relation("CajaCerradaPor")
   ventas           Venta[]                @relation("VentaUsuario")
   ventasCanceladas Venta[]                @relation("VentaCanceladaPor")
+  ordenesCompra    OrdenCompra[]          @relation("OcCreadaPor")
+  ordenesCanceladas OrdenCompra[]         @relation("OcCanceladaPor")
+  recepciones      RecepcionMercancia[]
   createdAt        DateTime               @default(now())
   updatedAt        DateTime               @updatedAt
 
@@ -222,6 +227,8 @@ model Producto {
   transferenciaLineas TransferenciaLinea[]
   ventaLineas         VentaLinea[]
   proveedores         ProveedorProducto[]
+  ocLineas            OcLinea[]
+  recepcionLineas     RecepcionLinea[]
   createdAt           DateTime               @default(now())
   updatedAt           DateTime               @updatedAt
 
@@ -249,11 +256,12 @@ model ProductoLote {
   caducidad     DateTime
   cantidad      Decimal                @default(0) @db.Decimal(14, 3)
   costoUnitario Decimal                @db.Decimal(12, 2)
-  producto      Producto               @relation(fields: [productoId], references: [id], onDelete: Cascade)
-  movimientos   InventarioMovimiento[]
-  ventaLineas   VentaLinea[]
-  createdAt     DateTime               @default(now())
-  updatedAt     DateTime               @updatedAt
+  producto         Producto               @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  movimientos      InventarioMovimiento[]
+  ventaLineas      VentaLinea[]
+  recepcionLineas  RecepcionLinea[]
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
 
   @@unique([productoId, lote])
   @@index([caducidad])
@@ -421,6 +429,7 @@ model Proveedor {
   saldoActual   Decimal             @default(0) @db.Decimal(12, 2)
   activo        Boolean             @default(true)
   productos     ProveedorProducto[]
+  ordenesCompra OrdenCompra[]
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
 
@@ -571,4 +580,110 @@ model VentaPago {
 
   @@index([ventaId])
   @@index([forma])
+}
+
+// =====================================================
+// COMPRAS: Órdenes de Compra y Recepciones de mercancía
+// =====================================================
+
+enum EstadoOrdenCompra {
+  BORRADOR // se puede editar y agregar líneas
+  ENVIADA // enviada al proveedor, ya no se editan líneas; admite recepciones
+  RECIBIDA_PARCIAL // hay al menos una recepción pero faltan productos
+  RECIBIDA_TOTAL // todas las líneas recibieron lo solicitado
+  CANCELADA // anulada antes de recibir nada
+}
+
+model OrdenCompra {
+  id                 String               @id @default(cuid())
+  folio              String               @unique // OC-YYYY-NNNNN
+  proveedorId        String
+  ubicacionDestinoId String
+  usuarioId          String // creador
+  estado             EstadoOrdenCompra    @default(BORRADOR)
+  subtotal           Decimal              @default(0) @db.Decimal(12, 2)
+  iva                Decimal              @default(0) @db.Decimal(12, 2)
+  total              Decimal              @default(0) @db.Decimal(12, 2)
+  fechaEsperada      DateTime?
+  observaciones      String?
+  enviadaEn          DateTime?
+  cerradaEn          DateTime?
+  motivoCancelacion  String?
+  canceladaPorId     String?
+  canceladaEn        DateTime?
+  proveedor          Proveedor            @relation(fields: [proveedorId], references: [id])
+  ubicacionDestino   Ubicacion            @relation(fields: [ubicacionDestinoId], references: [id])
+  usuario            Usuario              @relation("OcCreadaPor", fields: [usuarioId], references: [id])
+  canceladaPor       Usuario?             @relation("OcCanceladaPor", fields: [canceladaPorId], references: [id])
+  lineas             OcLinea[]
+  recepciones       RecepcionMercancia[]
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  @@index([proveedorId])
+  @@index([estado])
+  @@index([ubicacionDestinoId, estado])
+  @@index([createdAt])
+}
+
+model OcLinea {
+  id                 String           @id @default(cuid())
+  ordenCompraId      String
+  productoId         String
+  // Snapshot del producto al crear la OC (no cambia si el catálogo cambia)
+  productoSku        String
+  productoNombre     String
+  unidadMedida       String
+  codigoProveedor    String? // SKU del proveedor en su catálogo, al momento de crear la OC
+  cantidadSolicitada Decimal          @db.Decimal(14, 3)
+  cantidadRecibida   Decimal          @default(0) @db.Decimal(14, 3)
+  costoUnitario      Decimal          @db.Decimal(12, 4)
+  ivaTasa            Decimal          @default(0) @db.Decimal(5, 4)
+  subtotal           Decimal          @db.Decimal(12, 2) // cantidadSolicitada * costoUnitario
+  ivaImporte         Decimal          @default(0) @db.Decimal(12, 2)
+  total              Decimal          @db.Decimal(12, 2)
+  ordenCompra        OrdenCompra      @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
+  producto           Producto         @relation(fields: [productoId], references: [id])
+  recepcionLineas    RecepcionLinea[]
+
+  @@index([ordenCompraId])
+  @@index([productoId])
+}
+
+model RecepcionMercancia {
+  id             String           @id @default(cuid())
+  folio          String           @unique // REC-YYYY-NNNNN
+  ordenCompraId  String
+  ubicacionId    String // dónde entró la mercancía (debe coincidir con destino de la OC)
+  usuarioId     String
+  observaciones String?
+  fechaRecepcion DateTime         @default(now())
+  ordenCompra    OrdenCompra      @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
+  ubicacion      Ubicacion        @relation(fields: [ubicacionId], references: [id])
+  usuario        Usuario          @relation(fields: [usuarioId], references: [id])
+  lineas         RecepcionLinea[]
+  createdAt      DateTime         @default(now())
+
+  @@index([ordenCompraId])
+  @@index([ubicacionId, fechaRecepcion])
+}
+
+model RecepcionLinea {
+  id            String             @id @default(cuid())
+  recepcionId   String
+  ocLineaId     String
+  productoId    String
+  cantidad      Decimal            @db.Decimal(14, 3)
+  costoUnitario Decimal            @db.Decimal(12, 4) // puede diferir del costo en la OC
+  // Lote y caducidad opcionales (obligatorios en UI para medicamentos/alimentos)
+  lote          String?
+  caducidad     DateTime?
+  loteId        String? // referencia al ProductoLote creado/actualizado en la recepción
+  recepcion     RecepcionMercancia @relation(fields: [recepcionId], references: [id], onDelete: Cascade)
+  ocLinea       OcLinea            @relation(fields: [ocLineaId], references: [id])
+  producto      Producto           @relation(fields: [productoId], references: [id])
+  productoLote  ProductoLote?      @relation(fields: [loteId], references: [id], onDelete: SetNull)
+
+  @@index([recepcionId])
+  @@index([ocLineaId])
 }
