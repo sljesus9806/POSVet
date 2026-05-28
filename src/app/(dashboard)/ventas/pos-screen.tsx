@@ -124,6 +124,30 @@ export function POSScreen({
     () => (cliente ? Math.max(0, cliente.lineaCredito - cliente.saldoActual) : 0),
     [cliente],
   );
+
+  // Al cambiar tarjeta o crédito, reducimos el efectivo en proporción para que
+  // el "pagado" siga cuadrando con el total (el efectivo absorbe el cambio).
+  // Si el usuario edita efectivo a mano, no auto-ajustamos nada.
+  function actualizarPagoTarjeta(nuevoStr: string) {
+    const nuevo = Number(nuevoStr) || 0;
+    const previo = Number(pagoTarjeta) || 0;
+    const delta = nuevo - previo;
+    if (delta !== 0) {
+      const efectivoActual = Number(pagoEfectivo) || 0;
+      setPagoEfectivo(String(r2(Math.max(0, efectivoActual - delta))));
+    }
+    setPagoTarjeta(nuevoStr);
+  }
+  function actualizarPagoCredito(nuevoStr: string) {
+    const nuevo = Number(nuevoStr) || 0;
+    const previo = Number(pagoCredito) || 0;
+    const delta = nuevo - previo;
+    if (delta !== 0) {
+      const efectivoActual = Number(pagoEfectivo) || 0;
+      setPagoEfectivo(String(r2(Math.max(0, efectivoActual - delta))));
+    }
+    setPagoCredito(nuevoStr);
+  }
   const cambio = r2(Math.max(0, pagado - calculos.total));
 
   // ----- Búsqueda de productos -----
@@ -630,7 +654,7 @@ export function POSScreen({
                   step="0.01"
                   min="0"
                   value={pagoTarjeta}
-                  onChange={(e) => setPagoTarjeta(e.target.value)}
+                  onChange={(e) => actualizarPagoTarjeta(e.target.value)}
                   className="text-lg tabular-nums"
                 />
                 {(Number(pagoTarjeta) || 0) > 0 && (
@@ -658,7 +682,7 @@ export function POSScreen({
                     min="0"
                     max={creditoDisponible}
                     value={pagoCredito}
-                    onChange={(e) => setPagoCredito(e.target.value)}
+                    onChange={(e) => actualizarPagoCredito(e.target.value)}
                     className="text-lg tabular-nums"
                     disabled={creditoDisponible <= 0}
                   />
