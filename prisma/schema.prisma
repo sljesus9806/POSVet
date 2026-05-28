@@ -221,6 +221,7 @@ model Producto {
   movimientos         InventarioMovimiento[]
   transferenciaLineas TransferenciaLinea[]
   ventaLineas         VentaLinea[]
+  proveedores         ProveedorProducto[]
   createdAt           DateTime               @default(now())
   updatedAt           DateTime               @updatedAt
 
@@ -397,6 +398,55 @@ model Cliente {
   @@index([rfc])
   @@index([tipoCliente])
   @@index([activo])
+}
+
+// =====================================================
+// PROVEEDORES
+// =====================================================
+
+model Proveedor {
+  id            String              @id @default(cuid())
+  codigo        String              @unique // PRV-00001
+  nombre        String
+  rfc           String?
+  regimenFiscal String?
+  codigoPostal  String?
+  email         String?
+  telefono      String?
+  contacto      String? // persona de contacto
+  direccion     String?
+  notas         String?
+  // Campos reservados para Fase 2 (cuentas por pagar). Default 0, sin uso aún.
+  diasCredito   Int                 @default(0)
+  saldoActual   Decimal             @default(0) @db.Decimal(12, 2)
+  activo        Boolean             @default(true)
+  productos     ProveedorProducto[]
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@index([nombre])
+  @@index([rfc])
+  @@index([activo])
+}
+
+// Catálogo de productos que ofrece cada proveedor, con su precio de costo
+// y código/SKU propio del proveedor (útil para conciliar OC con facturas).
+model ProveedorProducto {
+  id              String    @id @default(cuid())
+  proveedorId     String
+  productoId      String
+  codigoProveedor String? // SKU o código que el proveedor usa para identificarlo
+  costoUnitario   Decimal   @default(0) @db.Decimal(12, 4)
+  esPreferido     Boolean   @default(false) // marca un proveedor preferente por producto
+  notas           String?
+  proveedor       Proveedor @relation(fields: [proveedorId], references: [id], onDelete: Cascade)
+  producto        Producto  @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([proveedorId, productoId])
+  @@index([productoId])
+  @@index([proveedorId, esPreferido])
 }
 
 // =====================================================
