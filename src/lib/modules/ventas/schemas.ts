@@ -1,8 +1,9 @@
 import { z } from "zod";
 
 export const formaPagoSchema = z.enum(["EFECTIVO", "TARJETA", "TRANSFERENCIA", "CREDITO"]);
-// MVP Fase 1 solo expone efectivo y tarjeta.
-export const formaPagoMvpSchema = z.enum(["EFECTIVO", "TARJETA"]);
+// POS expone las cuatro formas; la validación de CREDITO (requiere cliente con línea
+// suficiente) la hace el service contra cliente.lineaCredito y saldoActual.
+export const formaPagoMvpSchema = formaPagoSchema;
 
 // IDs internos: vienen de selects poblados por el servidor o ya validados por FK de Postgres.
 // No usamos .cuid() porque el seed de dev usa IDs legibles (ej. "ubicacion-tienda").
