@@ -14,6 +14,7 @@ import {
   Settings,
   LogOut,
   Boxes,
+  ClipboardList,
 } from "lucide-react";
 
 const NAV = [
@@ -23,6 +24,7 @@ const NAV = [
   { href: "/productos", label: "Productos", icon: Package },
   { href: "/inventario", label: "Inventario", icon: Boxes },
   { href: "/proveedores", label: "Proveedores", icon: Truck },
+  { href: "/compras", label: "Compras", icon: ClipboardList },
   { href: "/facturacion", label: "Facturación", icon: FileText, disabled: true },
   { href: "/reportes", label: "Reportes", icon: BarChart3 },
   { href: "/configuracion", label: "Configuración", icon: Settings, disabled: true },

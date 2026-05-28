@@ -496,6 +496,86 @@ export const inventarioService = {
   },
 
   /**
+   * Aplica una entrada de inventario por recepción de compra dentro de una
+   * transacción provista por el caller. Crea el InventarioMovimiento, actualiza
+   * el stock por ubicación y recalcula ultimoCosto/costoPromedio del producto.
+   *
+   * Devuelve `bajoMinimo` para que el caller emita alertas DESPUÉS del commit.
+   */
+  async aplicarEntradaPorCompra(
+    tx: Prisma.TransactionClient,
+    params: {
+      productoId: string;
+      ubicacionId: string;
+      loteId?: string | null;
+      cantidad: number;
+      costoUnitario: number;
+      usuarioId: string;
+      recepcionId: string;
+      folioRecepcion: string;
+    },
+  ) {
+    const inv = await obtenerOCrearInventario(tx, params.productoId, params.ubicacionId);
+    const stockPrevio = new D(inv.stock.toString());
+    const nuevoStock = stockPrevio.plus(params.cantidad);
+
+    const invActualizado = await tx.inventario.update({
+      where: { id: inv.id },
+      data: { stock: nuevoStock },
+    });
+
+    // Costo promedio ponderado por el stock total del producto (no por ubicación)
+    const prod = await tx.producto.findUniqueOrThrow({
+      where: { id: params.productoId },
+      select: { costoPromedio: true },
+    });
+    const stockTotalAgg = await tx.inventario.aggregate({
+      where: { productoId: params.productoId },
+      _sum: { stock: true },
+    });
+    // El stock devuelto por el aggregate ya incluye el update anterior dentro de la tx.
+    const stockTotalDespues = new D(stockTotalAgg._sum.stock?.toString() ?? "0");
+    const stockTotalAntes = stockTotalDespues.minus(params.cantidad);
+    const promedioPrevio = new D(prod.costoPromedio.toString());
+    const nuevoPromedio = stockTotalDespues.gt(0)
+      ? stockTotalAntes
+          .times(promedioPrevio)
+          .plus(new D(params.cantidad).times(params.costoUnitario))
+          .div(stockTotalDespues)
+      : new D(params.costoUnitario);
+    await tx.producto.update({
+      where: { id: params.productoId },
+      data: { ultimoCosto: params.costoUnitario, costoPromedio: nuevoPromedio },
+    });
+
+    const mov = await tx.inventarioMovimiento.create({
+      data: {
+        productoId: params.productoId,
+        ubicacionId: params.ubicacionId,
+        loteId: params.loteId ?? null,
+        tipo: "ENTRADA",
+        motivo: "COMPRA",
+        cantidad: params.cantidad,
+        costoUnitario: params.costoUnitario,
+        stockResultante: nuevoStock,
+        usuarioId: params.usuarioId,
+        referenciaTipo: "recepcion",
+        referenciaId: params.recepcionId,
+        observaciones: `Recepción ${params.folioRecepcion}`,
+      },
+    });
+
+    const stockResultante = Number(nuevoStock.toString());
+    const minimo = toNumber(invActualizado.stockMinimo);
+    return {
+      movimientoId: mov.id,
+      stockResultante,
+      bajoMinimo: minimo > 0 && stockResultante <= minimo,
+      stockMinimo: minimo,
+    };
+  },
+
+  /**
    * Restaura stock por cancelación de venta. Misma convención que aplicarSalidaPorVenta.
    */
   async aplicarEntradaPorCancelacionVenta(
