@@ -11,6 +11,14 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - posvet_pg_data:/var/lib/postgresql/data
+    # Flags SOLO para desarrollo local sobre btrfs. NO usar en producción:
+    # desactivan durabilidad para evitar los checkpoints lentos (sync=15s).
+    # Si el container crashea, basta con `npm run db:reset && npm run db:seed`.
+    command: >
+      postgres
+      -c fsync=off
+      -c synchronous_commit=off
+      -c full_page_writes=off
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-posvet} -d ${POSTGRES_DB:-posvet}"]
       interval: 5s
