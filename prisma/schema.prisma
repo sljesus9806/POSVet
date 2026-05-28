@@ -88,6 +88,10 @@ model Usuario {
   ordenesCompra    OrdenCompra[]          @relation("OcCreadaPor")
   ordenesCanceladas OrdenCompra[]         @relation("OcCanceladaPor")
   recepciones      RecepcionMercancia[]
+  facturasProveedorCapturadas FacturaProveedor[] @relation("FacturaProvCapturada")
+  facturasProveedorCanceladas FacturaProveedor[] @relation("FacturaProvCancelada")
+  pagosProveedorRegistrados ProveedorPago[]    @relation("PagoProvRegistrado")
+  pagosProveedorCancelados ProveedorPago[]    @relation("PagoProvCancelado")
   createdAt        DateTime               @default(now())
   updatedAt        DateTime               @updatedAt
 
@@ -430,6 +434,8 @@ model Proveedor {
   activo        Boolean             @default(true)
   productos     ProveedorProducto[]
   ordenesCompra OrdenCompra[]
+  facturas      FacturaProveedor[]
+  pagos         ProveedorPago[]
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
 
@@ -617,6 +623,7 @@ model OrdenCompra {
   canceladaPor       Usuario?             @relation("OcCanceladaPor", fields: [canceladaPorId], references: [id])
   lineas             OcLinea[]
   recepciones       RecepcionMercancia[]
+  facturas           FacturaProveedor[]
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
 
@@ -686,4 +693,101 @@ model RecepcionLinea {
 
   @@index([recepcionId])
   @@index([ocLineaId])
+}
+
+// =====================================================
+// CUENTAS POR PAGAR: Facturas del proveedor y Pagos
+// =====================================================
+
+enum EstadoFacturaProveedor {
+  PENDIENTE      // saldo > 0, sin pagos
+  PAGADA_PARCIAL // saldo > 0, con al menos un pago
+  PAGADA         // saldo == 0
+  CANCELADA      // anulada antes o después; no afecta saldo del proveedor
+}
+
+enum FormaPagoProveedor {
+  EFECTIVO
+  TRANSFERENCIA
+  CHEQUE
+  TARJETA
+  OTRO
+}
+
+enum EstadoProveedorPago {
+  REGISTRADO
+  CANCELADO
+}
+
+model FacturaProveedor {
+  id                String                  @id @default(cuid())
+  folio             String                  @unique // FCP-YYYY-NNNNN, interno
+  folioProveedor    String // folio que viene en la factura del proveedor (CFDI UUID o consecutivo)
+  proveedorId      String
+  ordenCompraId    String?
+  fechaEmision     DateTime
+  fechaVencimiento DateTime
+  subtotal         Decimal                 @default(0) @db.Decimal(12, 2)
+  iva              Decimal                 @default(0) @db.Decimal(12, 2)
+  total            Decimal                 @db.Decimal(12, 2)
+  saldo            Decimal                 @db.Decimal(12, 2) // total - sum(aplicaciones activas); 0 = pagada
+  estado           EstadoFacturaProveedor  @default(PENDIENTE)
+  observaciones    String?
+  motivoCancelacion String?
+  canceladaPorId   String?
+  canceladaEn      DateTime?
+  usuarioId        String // quien capturó la factura
+  proveedor        Proveedor               @relation(fields: [proveedorId], references: [id])
+  ordenCompra      OrdenCompra?            @relation(fields: [ordenCompraId], references: [id], onDelete: SetNull)
+  usuario          Usuario                 @relation("FacturaProvCapturada", fields: [usuarioId], references: [id])
+  canceladaPor     Usuario?                @relation("FacturaProvCancelada", fields: [canceladaPorId], references: [id])
+  aplicaciones     PagoFacturaAplicacion[]
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  // Un proveedor no debería repetir folio interno propio.
+  @@unique([proveedorId, folioProveedor])
+  @@index([proveedorId, estado])
+  @@index([estado])
+  @@index([fechaVencimiento])
+  @@index([ordenCompraId])
+}
+
+model ProveedorPago {
+  id                String                  @id @default(cuid())
+  folio             String                  @unique // PAG-YYYY-NNNNN
+  proveedorId       String
+  fecha             DateTime                @default(now())
+  formaPago         FormaPagoProveedor
+  monto             Decimal                 @db.Decimal(12, 2) // monto total del pago
+  referencia        String? // # transferencia / # cheque / autorización
+  observaciones     String?
+  estado            EstadoProveedorPago     @default(REGISTRADO)
+  motivoCancelacion String?
+  canceladoPorId    String?
+  canceladoEn       DateTime?
+  usuarioId         String
+  proveedor         Proveedor               @relation(fields: [proveedorId], references: [id])
+  usuario           Usuario                 @relation("PagoProvRegistrado", fields: [usuarioId], references: [id])
+  canceladoPor      Usuario?                @relation("PagoProvCancelado", fields: [canceladoPorId], references: [id])
+  aplicaciones      PagoFacturaAplicacion[]
+  createdAt         DateTime                @default(now())
+
+  @@index([proveedorId, fecha])
+  @@index([estado])
+  @@index([fecha])
+}
+
+// Distribución de un pago entre 1+ facturas. La suma de monto por pagoId debe
+// igualar ProveedorPago.monto (validado en service).
+model PagoFacturaAplicacion {
+  id        String           @id @default(cuid())
+  pagoId    String
+  facturaId String
+  monto     Decimal          @db.Decimal(12, 2)
+  pago      ProveedorPago    @relation(fields: [pagoId], references: [id], onDelete: Cascade)
+  factura   FacturaProveedor @relation(fields: [facturaId], references: [id])
+
+  @@unique([pagoId, facturaId])
+  @@index([facturaId])
 }
