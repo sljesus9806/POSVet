@@ -12,6 +12,7 @@ const MODULOS = [
   "proveedores",
   "compras",
   "cuentas-pagar",
+  "cobranza",
   "facturacion",
   "reportes",
   "usuarios",
@@ -53,6 +54,7 @@ const ROLES: Array<{
       "compras:leer",
       "compras:autorizar",
       "cuentas-pagar:*",
+      "cobranza:*",
     ],
   },
   {
@@ -68,6 +70,8 @@ const ROLES: Array<{
       "inventario:leer",
       "cajas:leer",
       "cajas:crear",
+      "cobranza:leer",
+      "cobranza:crear",
     ],
   },
   {
@@ -94,6 +98,7 @@ const ROLES: Array<{
       "proveedores:leer",
       "compras:leer",
       "cuentas-pagar:leer",
+      "cobranza:leer",
       "facturacion:leer",
       "reportes:leer",
     ],
