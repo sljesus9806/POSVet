@@ -4,6 +4,9 @@
 export const USUARIO_EVENTS = {
   CREADO: "usuario.creado",
   ACTUALIZADO: "usuario.actualizado",
+  DESACTIVADO: "usuario.desactivado",
+  PASSWORD_CAMBIADA: "usuario.password_cambiada",
+  DESBLOQUEADO: "usuario.desbloqueado",
   LOGIN_EXITOSO: "usuario.login_exitoso",
   LOGIN_FALLIDO: "usuario.login_fallido",
   BLOQUEADO: "usuario.bloqueado",
@@ -13,6 +16,13 @@ export type UsuarioCreadoPayload = {
   usuarioId: string;
   email: string;
   empresaId: string;
+};
+
+export type UsuarioActualizadoPayload = {
+  usuarioId: string;
+  email: string;
+  empresaId: string;
+  porUsuarioId: string;
 };
 
 export type LoginExitosoPayload = {

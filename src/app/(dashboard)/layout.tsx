@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/auth";
+import { hasPermission, type SessionUser } from "@/lib/auth-helpers";
 import { Button } from "@/components/ui/button";
 import { logoutAction } from "./actions";
 import {
@@ -17,6 +18,7 @@ import {
   ClipboardList,
   Wallet,
   HandCoins,
+  UserCog,
 } from "lucide-react";
 
 const NAV = [
@@ -31,6 +33,7 @@ const NAV = [
   { href: "/cuentas-pagar", label: "Cuentas por pagar", icon: Wallet },
   { href: "/facturacion", label: "Facturación", icon: FileText, disabled: true },
   { href: "/reportes", label: "Reportes", icon: BarChart3 },
+  { href: "/usuarios", label: "Usuarios", icon: UserCog, permiso: "usuarios:leer" },
   { href: "/configuracion", label: "Configuración", icon: Settings },
 ];
 
@@ -42,6 +45,11 @@ export default async function DashboardLayout({
   const session = await auth();
   if (!session?.user) redirect("/login");
 
+  const user = session.user as SessionUser;
+  const visibleNav = NAV.filter(
+    (item) => !("permiso" in item) || !item.permiso || hasPermission(user, item.permiso),
+  );
+
   return (
     <div className="flex min-h-screen w-full">
       <aside className="w-64 shrink-0 border-r bg-card flex flex-col">
@@ -49,7 +57,7 @@ export default async function DashboardLayout({
           <span className="font-semibold text-lg">POSVet</span>
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1">
-          {NAV.map((item) => {
+          {visibleNav.map((item) => {
             const Icon = item.icon;
             const className =
               "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors";
