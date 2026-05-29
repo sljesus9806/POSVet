@@ -12,10 +12,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { BarOrLineChart, ChartCard } from "@/components/reportes/chart-card";
 import { FiltrosForm } from "../filtros-form";
 import { PrintButton } from "../print-button";
 import { PrintStyles } from "../print-styles";
 import { formatearFecha, resolverRango, type RangoSearchParams } from "../_rango";
+import { PdfLink } from "../_pdf-link";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n);
@@ -60,7 +62,14 @@ export default async function ProductosVendidosPage({ searchParams }: { searchPa
             </p>
           </div>
         </div>
-        <PrintButton />
+        <div className="flex gap-2">
+          <PdfLink
+            href={`/api/reportes/productos-vendidos/pdf?desde=${rango.desdeStr}&hasta=${rango.hastaStr}${
+              rango.ubicacionId ? `&ubicacionId=${rango.ubicacionId}` : ""
+            }`}
+          />
+          <PrintButton />
+        </div>
       </div>
 
       <FiltrosForm
@@ -71,7 +80,29 @@ export default async function ProductosVendidosPage({ searchParams }: { searchPa
         ubicaciones={ubicaciones}
       />
 
-      <div className="print-card rounded-lg border bg-card p-5 space-y-4">
+      {reporte.filas.length > 0 && (
+        <div className="no-print">
+          <ChartCard
+            title="Top 10 productos por monto vendido"
+            subtitle={`De ${reporte.filas.length} productos en el rango`}
+          >
+            <BarOrLineChart
+              data={reporte.filas.slice(0, 10).map((f) => ({
+                nombre:
+                  f.nombre.length > 20 ? f.nombre.slice(0, 18) + "…" : f.nombre,
+                monto: f.montoTotal,
+              }))}
+              xKey="nombre"
+              yKeys={[{ key: "monto", label: "Monto" }]}
+              type="bar"
+              currency
+              height={280}
+            />
+          </ChartCard>
+        </div>
+      )}
+
+      <div className="print-card rounded-xl border bg-card p-5 space-y-4 shadow-sm">
         <header>
           <div className="text-lg font-semibold">Productos vendidos</div>
           <div className="text-sm text-muted-foreground">

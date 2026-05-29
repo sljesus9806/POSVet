@@ -1,10 +1,21 @@
 // API pública del módulo Reportes.
-// Otros módulos SOLO deben importar desde este archivo.
 
 export { reportesService } from "./service";
 
-export { filtroReporteSchema } from "./schemas";
-export type { FiltroReporteInput, FiltroReporteData } from "./schemas";
+export {
+  filtroReporteSchema,
+  filtroInventarioActualSchema,
+  filtroCaducidadSchema,
+  filtroSinMovimientoSchema,
+} from "./schemas";
+
+export type {
+  FiltroReporteInput,
+  FiltroReporteData,
+  FiltroInventarioActualInput,
+  FiltroCaducidadInput,
+  FiltroSinMovimientoInput,
+} from "./schemas";
 
 export type {
   RangoFechas,
@@ -13,4 +24,19 @@ export type {
   ProductosVendidosFila,
   VentasPorUsuarioReporte,
   VentasPorUsuarioFila,
+  InventarioActualReporte,
+  InventarioActualFila,
+  InventarioActualPorCategoria,
+  ProductosPorCaducarReporte,
+  ProductoPorCaducarFila,
+  CaducidadBucket,
+  AntiguedadSaldosReporte,
+  AntiguedadCxCFila,
+  AntiguedadCxPFila,
+  AntiguedadBucket,
+  ProductosSinMovimientoReporte,
+  ProductoSinMovimientoFila,
 } from "./types";
+
+export { generarReportePDF, pdfResponse, fmt as pdfFmt } from "./pdf";
+export type { GenerarPdfInput, PdfColumna, PdfTotalLinea } from "./pdf";

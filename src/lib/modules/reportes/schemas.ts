@@ -23,5 +23,25 @@ export const filtroReporteSchema = z
     path: ["hasta"],
   });
 
+export const filtroInventarioActualSchema = z.object({
+  ubicacionId: idOpcionalSchema,
+  categoriaId: idOpcionalSchema,
+  soloConStock: z.boolean().default(true),
+});
+
+export const filtroCaducidadSchema = z.object({
+  dias: z.coerce.number().int().min(1).max(365).default(90),
+  ubicacionId: idOpcionalSchema,
+});
+
+export const filtroSinMovimientoSchema = z.object({
+  dias: z.coerce.number().int().min(7).max(730).default(60),
+  categoriaId: idOpcionalSchema,
+  soloConStock: z.boolean().default(true),
+});
+
 export type FiltroReporteInput = z.input<typeof filtroReporteSchema>;
 export type FiltroReporteData = z.output<typeof filtroReporteSchema>;
+export type FiltroInventarioActualInput = z.input<typeof filtroInventarioActualSchema>;
+export type FiltroCaducidadInput = z.input<typeof filtroCaducidadSchema>;
+export type FiltroSinMovimientoInput = z.input<typeof filtroSinMovimientoSchema>;
