@@ -31,7 +31,7 @@ const NAV = [
   { href: "/cuentas-pagar", label: "Cuentas por pagar", icon: Wallet },
   { href: "/facturacion", label: "Facturación", icon: FileText, disabled: true },
   { href: "/reportes", label: "Reportes", icon: BarChart3 },
-  { href: "/configuracion", label: "Configuración", icon: Settings, disabled: true },
+  { href: "/configuracion", label: "Configuración", icon: Settings },
 ];
 
 export default async function DashboardLayout({
