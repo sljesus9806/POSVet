@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Search, Trash2, X, Banknote, CreditCard, Printer } from "lucide-react";
+import { Plus, Search, Trash2, X, Banknote, CreditCard, Printer, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +20,8 @@ type ClienteOpcion = {
   tipoCliente: "PUBLICO" | "MAYOREO" | "VETERINARIO" | "GRANJA";
   tipoPrecioEfectivo: TipoPrecio;
   rfc: string | null;
+  lineaCredito: number;
+  saldoActual: number;
 };
 
 type CajaActiva = {
@@ -84,6 +86,7 @@ export function POSScreen({
   const [pagoEfectivo, setPagoEfectivo] = useState<string>("0");
   const [pagoTarjeta, setPagoTarjeta] = useState<string>("0");
   const [refTarjeta, setRefTarjeta] = useState("");
+  const [pagoCredito, setPagoCredito] = useState<string>("0");
 
   const refBusquedaProducto = useRef<HTMLInputElement | null>(null);
   const refBusquedaCliente = useRef<HTMLInputElement | null>(null);
@@ -114,7 +117,37 @@ export function POSScreen({
     return { subtotal, iva, descuentoLineas, descuentoAplicado: descAplicado, total };
   }, [lineas, descuentoGlobal]);
 
-  const pagado = r2((Number(pagoEfectivo) || 0) + (Number(pagoTarjeta) || 0));
+  const pagado = r2(
+    (Number(pagoEfectivo) || 0) + (Number(pagoTarjeta) || 0) + (Number(pagoCredito) || 0),
+  );
+  const creditoDisponible = useMemo(
+    () => (cliente ? Math.max(0, cliente.lineaCredito - cliente.saldoActual) : 0),
+    [cliente],
+  );
+
+  // Al cambiar tarjeta o crédito, reducimos el efectivo en proporción para que
+  // el "pagado" siga cuadrando con el total (el efectivo absorbe el cambio).
+  // Si el usuario edita efectivo a mano, no auto-ajustamos nada.
+  function actualizarPagoTarjeta(nuevoStr: string) {
+    const nuevo = Number(nuevoStr) || 0;
+    const previo = Number(pagoTarjeta) || 0;
+    const delta = nuevo - previo;
+    if (delta !== 0) {
+      const efectivoActual = Number(pagoEfectivo) || 0;
+      setPagoEfectivo(String(r2(Math.max(0, efectivoActual - delta))));
+    }
+    setPagoTarjeta(nuevoStr);
+  }
+  function actualizarPagoCredito(nuevoStr: string) {
+    const nuevo = Number(nuevoStr) || 0;
+    const previo = Number(pagoCredito) || 0;
+    const delta = nuevo - previo;
+    if (delta !== 0) {
+      const efectivoActual = Number(pagoEfectivo) || 0;
+      setPagoEfectivo(String(r2(Math.max(0, efectivoActual - delta))));
+    }
+    setPagoCredito(nuevoStr);
+  }
   const cambio = r2(Math.max(0, pagado - calculos.total));
 
   // ----- Búsqueda de productos -----
@@ -222,6 +255,7 @@ export function POSScreen({
     setPagoEfectivo(String(calculos.total));
     setPagoTarjeta("0");
     setRefTarjeta("");
+    setPagoCredito("0");
     setMostrarCobro(true);
     setTimeout(() => refPagoEfectivo.current?.select(), 0);
   }
@@ -230,9 +264,21 @@ export function POSScreen({
     const pagos: CrearVentaInput["pagos"] = [];
     const efectivo = Number(pagoEfectivo) || 0;
     const tarjeta = Number(pagoTarjeta) || 0;
+    const credito = Number(pagoCredito) || 0;
     if (efectivo > 0) pagos.push({ forma: "EFECTIVO", monto: r2(efectivo) });
     if (tarjeta > 0)
       pagos.push({ forma: "TARJETA", monto: r2(tarjeta), referencia: refTarjeta || undefined });
+    if (credito > 0) {
+      if (!clienteId) {
+        setError("Crédito requiere cliente seleccionado");
+        return;
+      }
+      if (credito > creditoDisponible + 0.005) {
+        setError(`Crédito excede el disponible del cliente (${fmt(creditoDisponible)})`);
+        return;
+      }
+      pagos.push({ forma: "CREDITO", monto: r2(credito) });
+    }
     if (pagos.length === 0) {
       setError("Captura al menos un pago");
       return;
@@ -300,7 +346,7 @@ export function POSScreen({
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lineaActivaUid, lineas.length, mostrarCobro, calculos.total, pagoEfectivo, pagoTarjeta]);
+  }, [lineaActivaUid, lineas.length, mostrarCobro, calculos.total, pagoEfectivo, pagoTarjeta, pagoCredito]);
 
   // ----- Filtrado de clientes en client (lista pequeña) -----
   const clientesFiltrados = useMemo(() => {
@@ -608,7 +654,7 @@ export function POSScreen({
                   step="0.01"
                   min="0"
                   value={pagoTarjeta}
-                  onChange={(e) => setPagoTarjeta(e.target.value)}
+                  onChange={(e) => actualizarPagoTarjeta(e.target.value)}
                   className="text-lg tabular-nums"
                 />
                 {(Number(pagoTarjeta) || 0) > 0 && (
@@ -620,6 +666,33 @@ export function POSScreen({
                   />
                 )}
               </div>
+              {cliente && cliente.lineaCredito > 0 && (
+                <div>
+                  <label className="text-sm font-medium flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-2">
+                      <Wallet className="size-4" /> Crédito
+                    </span>
+                    <span className="text-xs font-normal text-muted-foreground">
+                      Disponible: <span className="tabular-nums font-medium text-foreground">{fmt(creditoDisponible)}</span>
+                    </span>
+                  </label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max={creditoDisponible}
+                    value={pagoCredito}
+                    onChange={(e) => actualizarPagoCredito(e.target.value)}
+                    className="text-lg tabular-nums"
+                    disabled={creditoDisponible <= 0}
+                  />
+                  {creditoDisponible <= 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      El cliente alcanzó su límite de crédito.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="border-t pt-3 space-y-1 text-sm">

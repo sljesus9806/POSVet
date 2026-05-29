@@ -41,6 +41,8 @@ export const crearClienteSchema = z.object({
   notas: opt(500),
   tipoCliente: tipoClienteSchema.default("PUBLICO"),
   tipoPrecio: tipoPrecioSchema.optional().or(z.literal("").transform(() => undefined)),
+  lineaCredito: z.number().nonnegative().default(0),
+  diasCredito: z.number().int().nonnegative().max(365).default(0),
 });
 
 export const actualizarClienteSchema = crearClienteSchema.partial().extend({

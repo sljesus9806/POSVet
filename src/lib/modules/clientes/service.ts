@@ -50,6 +50,9 @@ function aListado(c: Awaited<ReturnType<typeof clientesRepository.buscarPorId>> 
     email: c.email,
     telefono: c.telefono,
     activo: c.activo,
+    lineaCredito: Number(c.lineaCredito.toString()),
+    saldoActual: Number(c.saldoActual.toString()),
+    diasCredito: c.diasCredito,
   };
 }
 
@@ -100,6 +103,8 @@ export const clientesService = {
               notas: data.notas,
               tipoCliente: data.tipoCliente,
               tipoPrecio: data.tipoPrecio ?? null,
+              lineaCredito: data.lineaCredito,
+              diasCredito: data.diasCredito,
             },
           });
         });
@@ -154,6 +159,8 @@ export const clientesService = {
     if (data.notas !== undefined) update.notas = data.notas ?? null;
     if (data.tipoCliente !== undefined) update.tipoCliente = data.tipoCliente;
     if (data.tipoPrecio !== undefined) update.tipoPrecio = data.tipoPrecio ?? null;
+    if (data.lineaCredito !== undefined) update.lineaCredito = data.lineaCredito;
+    if (data.diasCredito !== undefined) update.diasCredito = data.diasCredito;
     if (data.activo !== undefined) update.activo = data.activo;
 
     const actualizado = await clientesRepository.actualizar(data.id, update);

@@ -92,6 +92,8 @@ model Usuario {
   facturasProveedorCanceladas FacturaProveedor[] @relation("FacturaProvCancelada")
   pagosProveedorRegistrados ProveedorPago[]    @relation("PagoProvRegistrado")
   pagosProveedorCancelados ProveedorPago[]    @relation("PagoProvCancelado")
+  abonosRegistrados   ClienteAbono[]      @relation("AbonoRegistrado")
+  abonosCancelados    ClienteAbono[]      @relation("AbonoCancelado")
   createdAt        DateTime               @default(now())
   updatedAt        DateTime               @updatedAt
 
@@ -403,6 +405,7 @@ model Cliente {
   saldoActual   Decimal     @default(0) @db.Decimal(12, 2)
   activo        Boolean     @default(true)
   ventas        Venta[]
+  abonos        ClienteAbono[]
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
@@ -529,6 +532,10 @@ model Venta {
   total               Decimal      @default(0) @db.Decimal(12, 2)
   totalPagado         Decimal      @default(0) @db.Decimal(12, 2)
   cambio              Decimal      @default(0) @db.Decimal(12, 2)
+  // Crédito otorgado en esta venta (suma de pagos con forma=CREDITO). saldoCredito
+  // decrece con abonos. Cuando saldoCredito > 0, la venta aporta al saldoActual del cliente.
+  montoCredito        Decimal      @default(0) @db.Decimal(12, 2)
+  saldoCredito        Decimal      @default(0) @db.Decimal(12, 2)
   observaciones       String?
   motivoCancelacion   String?
   canceladaPorId      String?
@@ -541,6 +548,7 @@ model Venta {
   cliente             Cliente?     @relation(fields: [clienteId], references: [id])
   lineas              VentaLinea[]
   pagos               VentaPago[]
+  abonosAplicados     AbonoVentaAplicacion[]
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
 
@@ -790,4 +798,60 @@ model PagoFacturaAplicacion {
 
   @@unique([pagoId, facturaId])
   @@index([facturaId])
+}
+
+// =====================================================
+// COBRANZA: abonos del cliente y su distribución a ventas a crédito
+// =====================================================
+
+enum FormaPagoAbono {
+  EFECTIVO
+  TRANSFERENCIA
+  CHEQUE
+  TARJETA
+  OTRO
+}
+
+enum EstadoClienteAbono {
+  REGISTRADO
+  CANCELADO
+}
+
+model ClienteAbono {
+  id                String                 @id @default(cuid())
+  folio             String                 @unique // ABO-YYYY-NNNNN
+  clienteId         String
+  fecha             DateTime               @default(now())
+  formaPago         FormaPagoAbono
+  monto             Decimal                @db.Decimal(12, 2)
+  referencia        String?
+  observaciones     String?
+  estado            EstadoClienteAbono     @default(REGISTRADO)
+  motivoCancelacion String?
+  canceladoPorId    String?
+  canceladoEn       DateTime?
+  usuarioId         String
+  cliente           Cliente                @relation(fields: [clienteId], references: [id])
+  usuario           Usuario                @relation("AbonoRegistrado", fields: [usuarioId], references: [id])
+  canceladoPor      Usuario?               @relation("AbonoCancelado", fields: [canceladoPorId], references: [id])
+  aplicaciones      AbonoVentaAplicacion[]
+  createdAt         DateTime               @default(now())
+
+  @@index([clienteId, fecha])
+  @@index([estado])
+  @@index([fecha])
+}
+
+// Distribución de un abono entre 1+ ventas a crédito del mismo cliente.
+// La suma de monto por abonoId debe igualar ClienteAbono.monto (validado en service).
+model AbonoVentaAplicacion {
+  id       String       @id @default(cuid())
+  abonoId  String
+  ventaId  String
+  monto    Decimal      @db.Decimal(12, 2)
+  abono    ClienteAbono @relation(fields: [abonoId], references: [id], onDelete: Cascade)
+  venta    Venta        @relation(fields: [ventaId], references: [id])
+
+  @@unique([abonoId, ventaId])
+  @@index([ventaId])
 }

@@ -62,6 +62,13 @@ export class VentaYaCanceladaError extends Error {
   }
 }
 
+export class VentaConAbonosAplicadosError extends Error {
+  constructor() {
+    super("La venta tiene abonos aplicados. Cancela primero esos abonos.");
+    this.name = "VentaConAbonosAplicadosError";
+  }
+}
+
 export class PagoInsuficienteError extends Error {
   constructor(public total: number, public pagado: number) {
     super(`El pago (${pagado.toFixed(2)}) no cubre el total (${total.toFixed(2)})`);
@@ -80,6 +87,34 @@ export class ProductoSinPrecioError extends Error {
   constructor(public sku: string) {
     super(`El producto ${sku} no tiene precio configurado`);
     this.name = "ProductoSinPrecioError";
+  }
+}
+
+export class CreditoSinClienteError extends Error {
+  constructor() {
+    super("Las ventas a crédito requieren un cliente seleccionado.");
+    this.name = "CreditoSinClienteError";
+  }
+}
+
+export class CreditoExcedeLineaError extends Error {
+  constructor(
+    public lineaCredito: number,
+    public saldoActual: number,
+    public montoCredito: number,
+  ) {
+    const disponible = Math.max(0, lineaCredito - saldoActual);
+    super(
+      `El crédito solicitado ($${montoCredito.toFixed(2)}) excede el disponible del cliente ($${disponible.toFixed(2)}).`,
+    );
+    this.name = "CreditoExcedeLineaError";
+  }
+}
+
+export class CreditoSinLineaError extends Error {
+  constructor() {
+    super("Este cliente no tiene línea de crédito autorizada.");
+    this.name = "CreditoSinLineaError";
   }
 }
 
@@ -343,15 +378,32 @@ export const ventasService = {
 
     // Cliente y tipo de precio efectivo
     let tipoPrecio: TipoPrecio = "PUBLICO";
+    let clienteInfo: {
+      id: string;
+      lineaCredito: number;
+      saldoActual: number;
+    } | null = null;
     if (data.clienteId) {
       const cliente = await prisma.cliente.findUnique({
         where: { id: data.clienteId },
-        select: { id: true, activo: true, tipoCliente: true, tipoPrecio: true },
+        select: {
+          id: true,
+          activo: true,
+          tipoCliente: true,
+          tipoPrecio: true,
+          lineaCredito: true,
+          saldoActual: true,
+        },
       });
       if (!cliente || !cliente.activo) {
         throw new Error("Cliente no encontrado o inactivo");
       }
       tipoPrecio = tipoPrecioEfectivo({ tipoCliente: cliente.tipoCliente, tipoPrecio: cliente.tipoPrecio });
+      clienteInfo = {
+        id: cliente.id,
+        lineaCredito: toNumber(cliente.lineaCredito),
+        saldoActual: toNumber(cliente.saldoActual),
+      };
     }
 
     // Cargar productos y precios para snapshot
@@ -423,6 +475,25 @@ export const ventasService = {
     const hayEfectivo = data.pagos.some((p) => p.forma === "EFECTIVO");
     if (cambio > 0 && !hayEfectivo) throw new CambioSoloEfectivoError();
 
+    // Validar crédito: si hay pago a crédito, requiere cliente con línea suficiente.
+    const montoCredito = r2(
+      data.pagos.filter((p) => p.forma === "CREDITO").reduce((acc, p) => acc + p.monto, 0),
+    );
+    if (montoCredito > 0) {
+      if (!clienteInfo) throw new CreditoSinClienteError();
+      if (clienteInfo.lineaCredito <= 0) throw new CreditoSinLineaError();
+      const nuevoSaldo = clienteInfo.saldoActual + montoCredito;
+      if (nuevoSaldo > clienteInfo.lineaCredito + 0.005) {
+        throw new CreditoExcedeLineaError(
+          clienteInfo.lineaCredito,
+          clienteInfo.saldoActual,
+          montoCredito,
+        );
+      }
+    }
+    // El cambio solo puede salir contra efectivo, no contra crédito (validado arriba),
+    // y el crédito no genera cambio.
+
     // Transacción: crear venta + líneas + pagos + descontar inventario atómicamente
     const { venta, alertasBajoStock } = await prisma.$transaction(async (tx) => {
       const folio = await ventasRepository.proximoFolioVenta(tx);
@@ -442,6 +513,8 @@ export const ventasService = {
           total,
           totalPagado: pagado,
           cambio,
+          montoCredito,
+          saldoCredito: montoCredito,
           observaciones: data.observaciones,
           lineas: {
             create: lineasCalc.map((l) => ({
@@ -484,6 +557,14 @@ export const ventasService = {
         where: { id: caja.id },
         data: { totalVendido: new D(caja.totalVendido.toString()).plus(total) },
       });
+
+      // Si la venta es a crédito, incrementa saldoActual del cliente.
+      if (montoCredito > 0 && clienteInfo) {
+        await tx.cliente.update({
+          where: { id: clienteInfo.id },
+          data: { saldoActual: { increment: montoCredito } },
+        });
+      }
 
       // Descontar inventario por línea
       const alertas: Array<{ productoId: string; ubicacionId: string; stock: number; stockMinimo: number }> = [];
@@ -552,6 +633,14 @@ export const ventasService = {
     if (!actual) throw new VentaNoEncontradaError();
     if (actual.estado === "CANCELADA") throw new VentaYaCanceladaError();
 
+    // Si la venta tiene crédito con abonos aplicados (saldo < monto), no permitir cancelar
+    // hasta que se cancelen esos abonos. saldoCredito solo cae con abonos REGISTRADOS.
+    const montoCredito = toNumber(actual.montoCredito);
+    const saldoCredito = toNumber(actual.saldoCredito);
+    if (montoCredito > 0 && saldoCredito < montoCredito - 0.005) {
+      throw new VentaConAbonosAplicadosError();
+    }
+
     const cancelada = await prisma.$transaction(async (tx) => {
       const v = await tx.venta.update({
         where: { id: actual.id },
@@ -578,6 +667,19 @@ export const ventasService = {
         await tx.caja.updateMany({
           where: { id: actual.cajaId, estado: "ABIERTA" },
           data: { totalVendido: { decrement: actual.total } },
+        });
+      }
+
+      // Si la venta era a crédito (saldo pendiente), reducimos el saldoActual del
+      // cliente por ese saldo (lo que aún no se cobraba) y dejamos saldoCredito=0.
+      if (saldoCredito > 0 && actual.clienteId) {
+        await tx.cliente.update({
+          where: { id: actual.clienteId },
+          data: { saldoActual: { decrement: saldoCredito } },
+        });
+        await tx.venta.update({
+          where: { id: actual.id },
+          data: { saldoCredito: 0 },
         });
       }
 
