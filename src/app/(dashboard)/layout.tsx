@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { auth } from "@/auth";
 import { hasPermission, type SessionUser } from "@/lib/auth-helpers";
 import { Button } from "@/components/ui/button";
 import { logoutAction } from "./actions";
+import { SidebarNav, type NavItem } from "./sidebar-nav";
 import {
   LayoutDashboard,
   Users,
@@ -19,23 +19,56 @@ import {
   Wallet,
   HandCoins,
   UserCog,
+  Stethoscope,
 } from "lucide-react";
 
-const NAV = [
-  { href: "/dashboard", label: "Inicio", icon: LayoutDashboard },
-  { href: "/ventas", label: "Ventas", icon: ShoppingCart, permiso: "ventas:leer" },
-  { href: "/clientes", label: "Clientes", icon: Users, permiso: "clientes:leer" },
-  { href: "/cobranza", label: "Cobranza", icon: HandCoins, permiso: "cobranza:leer" },
-  { href: "/productos", label: "Productos", icon: Package, permiso: "productos:leer" },
-  { href: "/inventario", label: "Inventario", icon: Boxes, permiso: "inventario:leer" },
-  { href: "/proveedores", label: "Proveedores", icon: Truck, permiso: "proveedores:leer" },
-  { href: "/compras", label: "Compras", icon: ClipboardList, permiso: "compras:leer" },
-  { href: "/cuentas-pagar", label: "Cuentas por pagar", icon: Wallet, permiso: "cuentas-pagar:leer" },
-  { href: "/facturacion", label: "Facturación", icon: FileText, disabled: true, permiso: "facturacion:leer" },
-  { href: "/reportes", label: "Reportes", icon: BarChart3, permiso: "reportes:leer" },
-  { href: "/usuarios", label: "Usuarios", icon: UserCog, permiso: "usuarios:leer" },
-  { href: "/configuracion", label: "Configuración", icon: Settings, permiso: "configuracion:leer" },
+const NAV: Array<NavItem & { permiso?: string }> = [
+  { href: "/dashboard", label: "Inicio", iconName: "home" },
+  { href: "/ventas", label: "Ventas", iconName: "ventas", permiso: "ventas:leer" },
+  { href: "/clientes", label: "Clientes", iconName: "clientes", permiso: "clientes:leer" },
+  { href: "/cobranza", label: "Cobranza", iconName: "cobranza", permiso: "cobranza:leer" },
+  { href: "/productos", label: "Productos", iconName: "productos", permiso: "productos:leer" },
+  { href: "/inventario", label: "Inventario", iconName: "inventario", permiso: "inventario:leer" },
+  { href: "/proveedores", label: "Proveedores", iconName: "proveedores", permiso: "proveedores:leer" },
+  { href: "/compras", label: "Compras", iconName: "compras", permiso: "compras:leer" },
+  { href: "/cuentas-pagar", label: "Cuentas por pagar", iconName: "cxp", permiso: "cuentas-pagar:leer" },
+  { href: "/facturacion", label: "Facturación", iconName: "facturacion", disabled: true, permiso: "facturacion:leer" },
+  { href: "/reportes", label: "Reportes", iconName: "reportes", permiso: "reportes:leer" },
+  { href: "/usuarios", label: "Usuarios", iconName: "usuarios", permiso: "usuarios:leer" },
+  { href: "/configuracion", label: "Configuración", iconName: "config", permiso: "configuracion:leer" },
 ];
+
+const ICONS = {
+  home: LayoutDashboard,
+  ventas: ShoppingCart,
+  clientes: Users,
+  cobranza: HandCoins,
+  productos: Package,
+  inventario: Boxes,
+  proveedores: Truck,
+  compras: ClipboardList,
+  cxp: Wallet,
+  facturacion: FileText,
+  reportes: BarChart3,
+  usuarios: UserCog,
+  config: Settings,
+};
+
+function saludo(now: Date): string {
+  const h = now.getHours();
+  if (h < 12) return "Buenos días";
+  if (h < 19) return "Buenas tardes";
+  return "Buenas noches";
+}
+
+function fechaLarga(now: Date): string {
+  return new Intl.DateTimeFormat("es-MX", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(now);
+}
 
 export default async function DashboardLayout({
   children,
@@ -47,52 +80,39 @@ export default async function DashboardLayout({
 
   const user = session.user as SessionUser;
   const visibleNav = NAV.filter(
-    (item) => !("permiso" in item) || !item.permiso || hasPermission(user, item.permiso),
+    (item) => !item.permiso || hasPermission(user, item.permiso),
   );
+
+  const ahora = new Date();
+  const nombreCorto = user.nombre.split(" ")[0] ?? user.nombre;
 
   return (
     <div className="flex min-h-screen w-full">
       <aside className="w-64 shrink-0 border-r bg-card flex flex-col">
-        <div className="h-16 px-6 flex items-center border-b">
-          <span className="font-semibold text-lg">POSVet</span>
-        </div>
-        <nav className="flex-1 px-3 py-4 space-y-1">
-          {visibleNav.map((item) => {
-            const Icon = item.icon;
-            const className =
-              "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors";
-            if (item.disabled) {
-              return (
-                <span
-                  key={item.href}
-                  className={`${className} text-muted-foreground cursor-not-allowed opacity-60`}
-                  title="Próximamente"
-                >
-                  <Icon className="size-4" />
-                  {item.label}
-                </span>
-              );
-            }
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`${className} hover:bg-accent hover:text-accent-foreground`}
-              >
-                <Icon className="size-4" />
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-        <div className="border-t p-3 space-y-2">
-          <div className="px-3 py-2 text-sm">
-            <p className="font-medium truncate">{session.user.nombre}</p>
-            <p className="text-xs text-muted-foreground truncate">
-              {session.user.email}
+        <div className="h-16 px-5 flex items-center gap-2.5 border-b">
+          <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+            <Stethoscope className="size-5" />
+          </span>
+          <div className="leading-none">
+            <p className="font-semibold text-base tracking-tight">POSVet</p>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mt-0.5">
+              Punto de venta
             </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {session.user.roles?.join(", ")}
+          </div>
+        </div>
+
+        <SidebarNav items={visibleNav} icons={ICONS} />
+
+        <div className="border-t p-3 space-y-2">
+          <div className="rounded-lg bg-secondary/40 px-3 py-2.5 text-sm">
+            <p className="font-medium truncate leading-tight">
+              {user.nombre}
+            </p>
+            <p className="text-xs text-muted-foreground truncate mt-0.5">
+              {user.email}
+            </p>
+            <p className="text-[10px] uppercase tracking-wider text-primary/80 mt-1.5 font-semibold">
+              {user.roles?.join(" · ")}
             </p>
           </div>
           <form action={logoutAction}>
@@ -110,10 +130,17 @@ export default async function DashboardLayout({
       </aside>
 
       <main className="flex-1 flex flex-col">
-        <header className="h-16 border-b px-6 flex items-center bg-card">
-          <h1 className="font-medium">Dashboard</h1>
+        <header className="h-16 border-b px-6 flex items-center justify-between bg-card/80 backdrop-blur-sm">
+          <div>
+            <p className="text-sm font-medium leading-tight">
+              {saludo(ahora)}, <span className="text-primary">{nombreCorto}</span>
+            </p>
+            <p className="text-[11px] text-muted-foreground capitalize leading-tight mt-0.5">
+              {fechaLarga(ahora)}
+            </p>
+          </div>
         </header>
-        <div className="flex-1 p-6 bg-muted/20">{children}</div>
+        <div className="flex-1 p-6 bg-muted/30">{children}</div>
       </main>
     </div>
   );
