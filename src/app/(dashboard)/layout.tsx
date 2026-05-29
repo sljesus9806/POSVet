@@ -23,18 +23,18 @@ import {
 
 const NAV = [
   { href: "/dashboard", label: "Inicio", icon: LayoutDashboard },
-  { href: "/ventas", label: "Ventas", icon: ShoppingCart },
-  { href: "/clientes", label: "Clientes", icon: Users },
-  { href: "/cobranza", label: "Cobranza", icon: HandCoins },
-  { href: "/productos", label: "Productos", icon: Package },
-  { href: "/inventario", label: "Inventario", icon: Boxes },
-  { href: "/proveedores", label: "Proveedores", icon: Truck },
-  { href: "/compras", label: "Compras", icon: ClipboardList },
-  { href: "/cuentas-pagar", label: "Cuentas por pagar", icon: Wallet },
-  { href: "/facturacion", label: "Facturación", icon: FileText, disabled: true },
-  { href: "/reportes", label: "Reportes", icon: BarChart3 },
+  { href: "/ventas", label: "Ventas", icon: ShoppingCart, permiso: "ventas:leer" },
+  { href: "/clientes", label: "Clientes", icon: Users, permiso: "clientes:leer" },
+  { href: "/cobranza", label: "Cobranza", icon: HandCoins, permiso: "cobranza:leer" },
+  { href: "/productos", label: "Productos", icon: Package, permiso: "productos:leer" },
+  { href: "/inventario", label: "Inventario", icon: Boxes, permiso: "inventario:leer" },
+  { href: "/proveedores", label: "Proveedores", icon: Truck, permiso: "proveedores:leer" },
+  { href: "/compras", label: "Compras", icon: ClipboardList, permiso: "compras:leer" },
+  { href: "/cuentas-pagar", label: "Cuentas por pagar", icon: Wallet, permiso: "cuentas-pagar:leer" },
+  { href: "/facturacion", label: "Facturación", icon: FileText, disabled: true, permiso: "facturacion:leer" },
+  { href: "/reportes", label: "Reportes", icon: BarChart3, permiso: "reportes:leer" },
   { href: "/usuarios", label: "Usuarios", icon: UserCog, permiso: "usuarios:leer" },
-  { href: "/configuracion", label: "Configuración", icon: Settings },
+  { href: "/configuracion", label: "Configuración", icon: Settings, permiso: "configuracion:leer" },
 ];
 
 export default async function DashboardLayout({
