@@ -13,7 +13,7 @@ export type VentasDelDiaReporte = {
   totalCancelado: number;
   numTicketsCancelados: number;
   porHora: Array<{
-    hora: number; // 0..23
+    hora: number;
     numTickets: number;
     total: number;
   }>;
@@ -57,4 +57,132 @@ export type VentasPorUsuarioReporte = {
   filas: VentasPorUsuarioFila[];
   totalGeneral: number;
   numTicketsGeneral: number;
+};
+
+// ===== Inventario actual valorizado =====
+export type InventarioActualFila = {
+  productoId: string;
+  sku: string;
+  nombre: string;
+  unidadMedida: string;
+  categoria: string | null;
+  ubicacionId: string;
+  ubicacionNombre: string;
+  stock: number;
+  costoUnitario: number;
+  precioVenta: number;
+  valorCosto: number;
+  valorVenta: number;
+};
+
+export type InventarioActualPorCategoria = {
+  categoria: string;
+  valorCosto: number;
+  valorVenta: number;
+};
+
+export type InventarioActualReporte = {
+  ubicacionId: string | null;
+  ubicacionNombre: string | null;
+  categoriaId: string | null;
+  categoriaNombre: string | null;
+  soloConStock: boolean;
+  filas: InventarioActualFila[];
+  totalCosto: number;
+  totalVenta: number;
+  margenPotencial: number; // venta - costo
+  porCategoria: InventarioActualPorCategoria[];
+};
+
+// ===== Productos por caducar =====
+export type CaducidadBucket = "vencidos" | "0-30" | "31-60" | "61-90" | "mas-90";
+
+export type ProductoPorCaducarFila = {
+  loteId: string;
+  productoId: string;
+  sku: string;
+  nombre: string;
+  unidadMedida: string;
+  lote: string;
+  caducidad: Date;
+  diasParaCaducar: number; // negativo si ya venció
+  cantidad: number;
+  costoUnitario: number;
+  bucket: CaducidadBucket;
+};
+
+export type ProductosPorCaducarReporte = {
+  diasUmbral: number;
+  filas: ProductoPorCaducarFila[];
+  porBucket: Array<{
+    bucket: CaducidadBucket;
+    label: string;
+    numLotes: number;
+    cantidad: number;
+    valorCosto: number;
+  }>;
+  totalLotes: number;
+  totalCantidad: number;
+  totalValorCosto: number;
+};
+
+// ===== Antigüedad de saldos =====
+export type AntiguedadBucket = "0-30" | "31-60" | "61-90" | "mas-90";
+
+export type AntiguedadCxCFila = {
+  clienteId: string;
+  clienteCodigo: string;
+  clienteNombre: string;
+  numDocumentos: number;
+  bucket0_30: number;
+  bucket31_60: number;
+  bucket61_90: number;
+  bucketMas90: number;
+  total: number;
+};
+
+export type AntiguedadCxPFila = {
+  proveedorId: string;
+  proveedorCodigo: string;
+  proveedorNombre: string;
+  numDocumentos: number;
+  bucket0_30: number;
+  bucket31_60: number;
+  bucket61_90: number;
+  bucketMas90: number;
+  total: number;
+};
+
+export type AntiguedadSaldosReporte<T = AntiguedadCxCFila | AntiguedadCxPFila> = {
+  fechaCorte: Date;
+  filas: T[];
+  totalGeneral: number;
+  totalBucket0_30: number;
+  totalBucket31_60: number;
+  totalBucket61_90: number;
+  totalBucketMas90: number;
+};
+
+// ===== Productos sin movimiento =====
+export type ProductoSinMovimientoFila = {
+  productoId: string;
+  sku: string;
+  nombre: string;
+  unidadMedida: string;
+  categoria: string | null;
+  ultimaVenta: Date | null;
+  diasSinVenta: number; // 999999 si nunca se ha vendido
+  stockTotal: number;
+  valorCosto: number;
+};
+
+export type ProductosSinMovimientoReporte = {
+  fechaCorte: Date;
+  diasUmbral: number;
+  categoriaId: string | null;
+  categoriaNombre: string | null;
+  soloConStock: boolean;
+  filas: ProductoSinMovimientoFila[];
+  totalProductos: number;
+  totalValorCosto: number;
 };
