@@ -59,6 +59,9 @@ export default async function DashboardLayout({
   const ahora = new Date();
   const nombreCorto = user.nombre.split(" ")[0] ?? user.nombre;
 
+  const ahora = new Date();
+  const nombreCorto = user.nombre.split(" ")[0] ?? user.nombre;
+
   return (
     <div className="flex min-h-screen w-full">
       <aside className="w-64 shrink-0 border-r bg-card flex flex-col">
