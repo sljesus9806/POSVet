@@ -1,26 +1,10 @@
 import { redirect } from "next/navigation";
+import { Stethoscope, LogOut } from "lucide-react";
 import { auth } from "@/auth";
 import { hasPermission, type SessionUser } from "@/lib/auth-helpers";
 import { Button } from "@/components/ui/button";
 import { logoutAction } from "./actions";
 import { SidebarNav, type NavItem } from "./sidebar-nav";
-import {
-  LayoutDashboard,
-  Users,
-  Package,
-  ShoppingCart,
-  FileText,
-  Truck,
-  BarChart3,
-  Settings,
-  LogOut,
-  Boxes,
-  ClipboardList,
-  Wallet,
-  HandCoins,
-  UserCog,
-  Stethoscope,
-} from "lucide-react";
 
 const NAV: Array<NavItem & { permiso?: string }> = [
   { href: "/dashboard", label: "Inicio", iconName: "home" },
@@ -37,22 +21,6 @@ const NAV: Array<NavItem & { permiso?: string }> = [
   { href: "/usuarios", label: "Usuarios", iconName: "usuarios", permiso: "usuarios:leer" },
   { href: "/configuracion", label: "Configuración", iconName: "config", permiso: "configuracion:leer" },
 ];
-
-const ICONS = {
-  home: LayoutDashboard,
-  ventas: ShoppingCart,
-  clientes: Users,
-  cobranza: HandCoins,
-  productos: Package,
-  inventario: Boxes,
-  proveedores: Truck,
-  compras: ClipboardList,
-  cxp: Wallet,
-  facturacion: FileText,
-  reportes: BarChart3,
-  usuarios: UserCog,
-  config: Settings,
-};
 
 function saludo(now: Date): string {
   const h = now.getHours();
@@ -79,9 +47,17 @@ export default async function DashboardLayout({
   if (!session?.user) redirect("/login");
 
   const user = session.user as SessionUser;
-  const visibleNav = NAV.filter(
+  const visibleNav: NavItem[] = NAV.filter(
     (item) => !item.permiso || hasPermission(user, item.permiso),
-  );
+  ).map((item) => ({
+    href: item.href,
+    label: item.label,
+    iconName: item.iconName,
+    disabled: item.disabled,
+  }));
+
+  const ahora = new Date();
+  const nombreCorto = user.nombre.split(" ")[0] ?? user.nombre;
 
   const ahora = new Date();
   const nombreCorto = user.nombre.split(" ")[0] ?? user.nombre;
@@ -101,7 +77,7 @@ export default async function DashboardLayout({
           </div>
         </div>
 
-        <SidebarNav items={visibleNav} icons={ICONS} />
+        <SidebarNav items={visibleNav} />
 
         <div className="border-t p-3 space-y-2">
           <div className="rounded-lg bg-secondary/40 px-3 py-2.5 text-sm">
