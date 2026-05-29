@@ -2,28 +2,68 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { LucideIcon } from "lucide-react";
+import {
+  LayoutDashboard,
+  Users,
+  Package,
+  ShoppingCart,
+  FileText,
+  Truck,
+  BarChart3,
+  Settings,
+  Boxes,
+  ClipboardList,
+  Wallet,
+  HandCoins,
+  UserCog,
+  type LucideIcon,
+} from "lucide-react";
 
 export type NavItem = {
   href: string;
   label: string;
-  iconName: string;
+  iconName: IconName;
   disabled?: boolean;
 };
 
-export function SidebarNav({
-  items,
-  icons,
-}: {
-  items: NavItem[];
-  icons: Record<string, LucideIcon>;
-}) {
+export type IconName =
+  | "home"
+  | "ventas"
+  | "clientes"
+  | "cobranza"
+  | "productos"
+  | "inventario"
+  | "proveedores"
+  | "compras"
+  | "cxp"
+  | "facturacion"
+  | "reportes"
+  | "usuarios"
+  | "config";
+
+const ICONS: Record<IconName, LucideIcon> = {
+  home: LayoutDashboard,
+  ventas: ShoppingCart,
+  clientes: Users,
+  cobranza: HandCoins,
+  productos: Package,
+  inventario: Boxes,
+  proveedores: Truck,
+  compras: ClipboardList,
+  cxp: Wallet,
+  facturacion: FileText,
+  reportes: BarChart3,
+  usuarios: UserCog,
+  config: Settings,
+};
+
+export function SidebarNav({ items }: { items: NavItem[] }) {
   const pathname = usePathname() ?? "";
 
   return (
     <nav className="flex-1 px-3 py-4 space-y-1">
       {items.map((item) => {
-        const Icon = icons[item.iconName];
+        const Icon = ICONS[item.iconName];
         const base =
           "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-150";
 
