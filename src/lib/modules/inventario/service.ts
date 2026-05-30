@@ -128,24 +128,32 @@ export const inventarioService = {
 
     const resultado = await prisma.$transaction(async (tx) => {
       const inv = await obtenerOCrearInventario(tx, data.productoId, data.ubicacionId);
-      const stockActual = new D(inv.stock.toString());
-      const nuevoStock =
-        data.delta > 0
-          ? stockActual.plus(cantidad)
-          : stockActual.minus(cantidad);
 
-      if (nuevoStock.lt(0)) {
-        throw new StockInsuficienteError(
-          data.productoId,
-          data.ubicacionId,
-          Number(nuevoStock.abs().toString()),
-        );
+      // Aplicación atómica del ajuste: increment para entradas; para salidas,
+      // UPDATE ... WHERE stock >= cantidad, que bajo concurrencia evita dejar el
+      // stock negativo (el read-check-write previo no era seguro). Ver issue #20.
+      if (data.delta > 0) {
+        await tx.inventario.update({
+          where: { id: inv.id },
+          data: { stock: { increment: cantidad } },
+        });
+      } else {
+        const descuento = await tx.inventario.updateMany({
+          where: { id: inv.id, stock: { gte: cantidad } },
+          data: { stock: { decrement: cantidad } },
+        });
+        if (descuento.count === 0) {
+          const actual = await tx.inventario.findUniqueOrThrow({ where: { id: inv.id } });
+          throw new StockInsuficienteError(
+            data.productoId,
+            data.ubicacionId,
+            Number(new D(cantidad).minus(actual.stock.toString()).toString()),
+          );
+        }
       }
 
-      const invActualizado = await tx.inventario.update({
-        where: { id: inv.id },
-        data: { stock: nuevoStock },
-      });
+      const invActualizado = await tx.inventario.findUniqueOrThrow({ where: { id: inv.id } });
+      const nuevoStock = new D(invActualizado.stock.toString());
 
       const mov = await tx.inventarioMovimiento.create({
         data: {
@@ -316,15 +324,30 @@ export const inventarioService = {
 
       // Mover stock línea por línea
       for (const linea of data.lineas) {
-        // SALIDA del origen
+        // SALIDA del origen — descuento atómico con guarda de stock (ver issue #20).
+        const descuentoOrigen = await tx.inventario.updateMany({
+          where: {
+            productoId: linea.productoId,
+            ubicacionId: data.origenId,
+            stock: { gte: linea.cantidad },
+          },
+          data: { stock: { decrement: linea.cantidad } },
+        });
+        if (descuentoOrigen.count === 0) {
+          const actual = await tx.inventario.findUnique({
+            where: { productoId_ubicacionId: { productoId: linea.productoId, ubicacionId: data.origenId } },
+          });
+          const disponible = actual ? new D(actual.stock.toString()) : new D(0);
+          throw new StockInsuficienteError(
+            linea.productoId,
+            data.origenId,
+            Number(new D(linea.cantidad).minus(disponible).toString()),
+          );
+        }
         const invOrigen = await tx.inventario.findUniqueOrThrow({
           where: { productoId_ubicacionId: { productoId: linea.productoId, ubicacionId: data.origenId } },
         });
-        const stockOrigen = new D(invOrigen.stock.toString()).minus(linea.cantidad);
-        await tx.inventario.update({
-          where: { id: invOrigen.id },
-          data: { stock: stockOrigen },
-        });
+        const stockOrigen = new D(invOrigen.stock.toString());
         await tx.inventarioMovimiento.create({
           data: {
             productoId: linea.productoId,
@@ -340,13 +363,14 @@ export const inventarioService = {
           },
         });
 
-        // ENTRADA al destino
+        // ENTRADA al destino — incremento atómico (evita lost updates concurrentes).
         const invDestino = await obtenerOCrearInventario(tx, linea.productoId, data.destinoId);
-        const stockDestino = new D(invDestino.stock.toString()).plus(linea.cantidad);
         await tx.inventario.update({
           where: { id: invDestino.id },
-          data: { stock: stockDestino },
+          data: { stock: { increment: linea.cantidad } },
         });
+        const invDestinoActualizado = await tx.inventario.findUniqueOrThrow({ where: { id: invDestino.id } });
+        const stockDestino = new D(invDestinoActualizado.stock.toString());
         await tx.inventarioMovimiento.create({
           data: {
             productoId: linea.productoId,
