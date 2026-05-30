@@ -450,24 +450,33 @@ export const inventarioService = {
       folioVenta: string;
     },
   ) {
-    const inv = await tx.inventario.findUnique({
-      where: { productoId_ubicacionId: { productoId: params.productoId, ubicacionId: params.ubicacionId } },
+    // Descuento atómico con guarda de stock: UPDATE ... WHERE stock >= cantidad.
+    // Bajo concurrencia (READ COMMITTED) el segundo UPDATE espera el lock de fila y al
+    // reevaluar el WHERE contra el stock ya comprometido no afecta filas, evitando la
+    // sobreventa. El read-check-write previo no era seguro. Ver issue #20.
+    const descuento = await tx.inventario.updateMany({
+      where: {
+        productoId: params.productoId,
+        ubicacionId: params.ubicacionId,
+        stock: { gte: params.cantidad },
+      },
+      data: { stock: { decrement: params.cantidad } },
     });
-    const stockActual = inv ? new D(inv.stock.toString()) : new D(0);
-    if (stockActual.lt(params.cantidad)) {
+    if (descuento.count === 0) {
+      const actual = await tx.inventario.findUnique({
+        where: { productoId_ubicacionId: { productoId: params.productoId, ubicacionId: params.ubicacionId } },
+      });
+      const disponible = actual ? new D(actual.stock.toString()) : new D(0);
       throw new StockInsuficienteError(
         params.productoId,
         params.ubicacionId,
-        Number(new D(params.cantidad).minus(stockActual).toString()),
+        Number(new D(params.cantidad).minus(disponible).toString()),
       );
     }
-    const nuevoStock = stockActual.minus(params.cantidad);
-
-    const invActualizado = inv
-      ? await tx.inventario.update({ where: { id: inv.id }, data: { stock: nuevoStock } })
-      : await tx.inventario.create({
-          data: { productoId: params.productoId, ubicacionId: params.ubicacionId, stock: nuevoStock, stockMinimo: 0 },
-        });
+    const invActualizado = await tx.inventario.findUniqueOrThrow({
+      where: { productoId_ubicacionId: { productoId: params.productoId, ubicacionId: params.ubicacionId } },
+    });
+    const nuevoStock = new D(invActualizado.stock.toString());
 
     const mov = await tx.inventarioMovimiento.create({
       data: {
