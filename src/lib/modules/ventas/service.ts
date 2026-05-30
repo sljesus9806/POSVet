@@ -494,8 +494,15 @@ export const ventasService = {
     // El cambio solo puede salir contra efectivo, no contra crédito (validado arriba),
     // y el crédito no genera cambio.
 
-    // Transacción: crear venta + líneas + pagos + descontar inventario atómicamente
-    const { venta, alertasBajoStock } = await prisma.$transaction(async (tx) => {
+    // Transacción: crear venta + líneas + pagos + descontar inventario atómicamente.
+    // Reintenta ante colisión de folio (correlativo no atómico, protegido por @unique);
+    // mismo patrón que compras/cobranza/cuentas-pagar. Ver issue #20.
+    let venta: VentaConRelaciones | undefined;
+    let alertasBajoStock: Array<{ productoId: string; ubicacionId: string; stock: number; stockMinimo: number }> = [];
+    let folioError: unknown;
+    for (let intento = 0; intento < 5; intento++) {
+    try {
+    const resultadoTx = await prisma.$transaction(async (tx) => {
       const folio = await ventasRepository.proximoFolioVenta(tx);
       const v = await tx.venta.create({
         data: {
@@ -597,6 +604,24 @@ export const ventasService = {
       }
       return { venta: v, alertasBajoStock: alertas };
     }, TX_OPTS);
+    venta = resultadoTx.venta;
+    alertasBajoStock = resultadoTx.alertasBajoStock;
+    break;
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === "P2002" &&
+        (err.meta?.target as string[] | undefined)?.includes("folio")
+      ) {
+        folioError = err;
+        continue;
+      }
+      throw err;
+    }
+    }
+    if (!venta) {
+      throw folioError ?? new Error("No se pudo generar un folio de venta único");
+    }
 
     await audit({
       usuarioId: ctx.usuarioId,
