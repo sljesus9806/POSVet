@@ -855,3 +855,24 @@ model AbonoVentaAplicacion {
   @@unique([abonoId, ventaId])
   @@index([ventaId])
 }
+
+// =====================================================
+// LICENCIA (control de membresía / anti-cracking)
+// =====================================================
+
+// Una fila por instalación. Guarda el token firmado (Ed25519) que autoriza el
+// uso del sistema. La verificación usa la llave pública embebida en el módulo
+// `licencia`; falsificar un token requiere la llave privada del emisor, que
+// nunca vive en el repo ni en la copia del cliente.
+model Licencia {
+  id               String    @id @default(cuid())
+  token            String // JWS compacto: base64url(payload).base64url(firma)
+  licenseId        String // id de licencia (del payload), para referencia
+  cliente          String // negocio licenciado (visible en la UI)
+  modo             String // "online" | "offline"
+  instalacion      String    @unique // id único de esta copia instalada
+  ultimaValidacion DateTime?
+  ultimoEstado     String? // valida | gracia | expirada | invalida
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}

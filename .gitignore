@@ -46,3 +46,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# licencia: llaves privadas y artefactos del emisor
+/.licencia/
