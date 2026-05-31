@@ -14,7 +14,10 @@
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
     "db:seed": "prisma db seed",
-    "db:reset": "prisma migrate reset"
+    "db:reset": "prisma migrate reset",
+    "lic:keygen": "tsx scripts/licencia/keygen.ts",
+    "lic:emitir": "tsx scripts/licencia/emitir.ts",
+    "lic:instalar": "tsx scripts/licencia/instalar.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
