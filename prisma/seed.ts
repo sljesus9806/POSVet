@@ -18,6 +18,7 @@ const MODULOS = [
   "usuarios",
   "configuracion",
   "cajas",
+  "auditoria",
 ] as const;
 
 const ACCIONES = ["leer", "crear", "editar", "eliminar", "autorizar"] as const;
