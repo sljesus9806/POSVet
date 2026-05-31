@@ -36,6 +36,8 @@ export type {
   AntiguedadBucket,
   ProductosSinMovimientoReporte,
   ProductoSinMovimientoFila,
+  CorteCajaFila,
+  CorteCajasReporte,
 } from "./types";
 
 export { generarReportePDF, pdfResponse, fmt as pdfFmt } from "./pdf";
