@@ -49,3 +49,6 @@ next-env.d.ts
 
 # licencia: llaves privadas y artefactos del emisor
 /.licencia/
+
+# seed compilado para el empaquetado de escritorio
+/prisma/seed.mjs

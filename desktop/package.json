@@ -1,0 +1,24 @@
+{
+  "name": "posvet-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Empaquetado de escritorio de POSVet (Electron + Postgres embebido)",
+  "main": "electron/main.js",
+  "type": "commonjs",
+  "scripts": {
+    "boot-test": "node scripts/boot-test.mjs",
+    "build:app": "node scripts/prepare-standalone.mjs",
+    "build:seed": "esbuild ../prisma/seed.ts --bundle --platform=node --format=esm --packages=external --outfile=../prisma/seed.mjs",
+    "desktop:dev": "electron .",
+    "dist": "npm run build:seed && electron-builder --win --config electron-builder.yml"
+  },
+  "dependencies": {
+    "embedded-postgres": "^18.3.0-beta.17",
+    "pg": "^8.21.0"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.0",
+    "esbuild": "^0.24.0"
+  }
+}

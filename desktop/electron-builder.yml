@@ -1,0 +1,41 @@
+appId: com.posvet.desktop
+productName: POSVet
+copyright: POSVet
+
+directories:
+  output: dist
+  buildResources: build
+
+# Lo que va dentro del .asar (el caparazón Electron + sus dependencias nativas).
+files:
+  - electron/**
+  - package.json
+  - node_modules/**
+
+# El servidor Next ya construido, el esquema y las migraciones van como recursos
+# fuera del asar (Postgres y Next necesitan archivos reales en disco).
+# `appRoot` en producción = resources/app (ver electron/main.js).
+extraResources:
+  - from: ../.next/standalone
+    to: app/.next/standalone
+  - from: ../prisma
+    to: app/prisma
+    filter:
+      - "**/*"
+      - "!dev.db*"
+
+# embedded-postgres trae binarios nativos; no deben empacarse dentro del asar.
+asarUnpack:
+  - node_modules/@embedded-postgres/**
+
+win:
+  target:
+    - nsis
+  # icon: build/icon.ico
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: POSVet
