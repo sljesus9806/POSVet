@@ -17,7 +17,8 @@
     "db:reset": "prisma migrate reset",
     "lic:keygen": "tsx scripts/licencia/keygen.ts",
     "lic:emitir": "tsx scripts/licencia/emitir.ts",
-    "lic:instalar": "tsx scripts/licencia/instalar.ts"
+    "lic:instalar": "tsx scripts/licencia/instalar.ts",
+    "lic:activar": "tsx scripts/licencia/activar.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

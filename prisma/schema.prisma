@@ -873,6 +873,10 @@ model Licencia {
   instalacion      String    @unique // id único de esta copia instalada
   ultimaValidacion DateTime?
   ultimoEstado     String? // valida | gracia | expirada | invalida
+  // Config del modo online (phone-home a la plataforma). Null en offline.
+  apiUrl           String? // URL base de la plataforma de licencias
+  claveActivacion  String? // secreto del cliente para renovar
+  ultimaSync       DateTime? // última vez que se renovó/contactó la plataforma
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 }

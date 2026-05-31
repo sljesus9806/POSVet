@@ -3,6 +3,8 @@
 
 export { licenciaService, LicenciaInvalidaError } from "./service";
 
+export { activarOnline, sincronizar, type ResultadoSync } from "./online";
+
 export { licenciaPayloadSchema } from "./schemas";
 export type { LicenciaPayload } from "./schemas";
 
