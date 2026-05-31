@@ -7,6 +7,7 @@ import {
   Package,
   PackageX,
   Users,
+  Wallet,
   Warehouse,
 } from "lucide-react";
 import { requirePermission } from "@/lib/auth-helpers";
@@ -43,6 +44,14 @@ const REPORTES: ReporteCard[] = [
     titulo: "Ventas por usuario",
     descripcion: "Cuánto vendió cada cajero, con donut de participación.",
     icon: Users,
+    grupo: "Ventas",
+    tone: "primary",
+  },
+  {
+    href: "/reportes/corte-caja",
+    titulo: "Corte de caja",
+    descripcion: "Cajas por rango con esperado vs contado y diferencia; corte formal por caja.",
+    icon: Wallet,
     grupo: "Ventas",
     tone: "primary",
   },

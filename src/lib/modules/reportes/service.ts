@@ -10,6 +10,8 @@ import {
   type FiltroSinMovimientoInput,
 } from "./schemas";
 import type {
+  CorteCajaFila,
+  CorteCajasReporte,
   AntiguedadBucket,
   AntiguedadCxCFila,
   AntiguedadCxPFila,
@@ -463,6 +465,48 @@ export const reportesService = {
       filas: filtradas,
       totalProductos: filtradas.length,
       totalValorCosto: filtradas.reduce((a, f) => a + f.valorCosto, 0),
+    };
+  },
+
+  // ===== Corte de caja: resumen de cajas (sesiones) en un rango =====
+  async corteCajas(input: FiltroReporteInput): Promise<CorteCajasReporte> {
+    const filtro = filtroReporteSchema.parse(input);
+    const [cajas, ubicacionNombre] = await Promise.all([
+      reportesRepository.cajasEnRango({
+        desde: filtro.desde,
+        hasta: filtro.hasta,
+        ubicacionId: filtro.ubicacionId,
+      }),
+      nombreUbicacion(filtro.ubicacionId),
+    ]);
+
+    const filas: CorteCajaFila[] = cajas.map((c) => ({
+      id: c.id,
+      folio: c.folio,
+      estado: c.estado,
+      ubicacionNombre: c.ubicacion.nombre,
+      abiertaPorNombre: c.abiertaPor.nombre,
+      cerradaPorNombre: c.cerradaPor?.nombre ?? null,
+      abiertaEn: c.abiertaEn,
+      cerradaEn: c.cerradaEn,
+      fondoInicial: toNum(c.fondoInicial),
+      totalVendido: toNum(c.totalVendido),
+      numVentas: c._count.ventas,
+      efectivoEsperado: c.montoEsperadoEfectivo != null ? toNum(c.montoEsperadoEfectivo) : null,
+      montoContado: c.montoContadoEfectivo != null ? toNum(c.montoContadoEfectivo) : null,
+      diferencia: c.diferenciaEfectivo != null ? toNum(c.diferenciaEfectivo) : null,
+    }));
+
+    return {
+      rango: { desde: filtro.desde, hasta: filtro.hasta },
+      ubicacionId: filtro.ubicacionId ?? null,
+      ubicacionNombre,
+      filas,
+      numCajas: filas.length,
+      totalFondo: filas.reduce((a, f) => a + f.fondoInicial, 0),
+      totalVendido: filas.reduce((a, f) => a + f.totalVendido, 0),
+      totalContado: filas.reduce((a, f) => a + (f.montoContado ?? 0), 0),
+      totalDiferencia: filas.reduce((a, f) => a + (f.diferencia ?? 0), 0),
     };
   },
 };

@@ -186,3 +186,33 @@ export type ProductosSinMovimientoReporte = {
   totalProductos: number;
   totalValorCosto: number;
 };
+
+// ===== Corte de caja =====
+export type CorteCajaFila = {
+  id: string;
+  folio: string;
+  estado: "ABIERTA" | "CERRADA";
+  ubicacionNombre: string;
+  abiertaPorNombre: string;
+  cerradaPorNombre: string | null;
+  abiertaEn: Date;
+  cerradaEn: Date | null;
+  fondoInicial: number;
+  totalVendido: number;
+  numVentas: number;
+  efectivoEsperado: number | null; // null mientras la caja siga abierta
+  montoContado: number | null;
+  diferencia: number | null;
+};
+
+export type CorteCajasReporte = {
+  rango: RangoFechas;
+  ubicacionId: string | null;
+  ubicacionNombre: string | null;
+  filas: CorteCajaFila[];
+  numCajas: number;
+  totalFondo: number;
+  totalVendido: number;
+  totalContado: number;
+  totalDiferencia: number;
+};

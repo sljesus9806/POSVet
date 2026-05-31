@@ -240,5 +240,32 @@ export const reportesRepository = {
     return m;
   },
 
+  // ===== Corte de caja: cajas (sesiones) abiertas dentro del rango =====
+  async cajasEnRango(w: { desde: Date; hasta: Date; ubicacionId?: string }) {
+    return prisma.caja.findMany({
+      where: {
+        abiertaEn: { gte: w.desde, lte: w.hasta },
+        ...(w.ubicacionId ? { ubicacionId: w.ubicacionId } : {}),
+      },
+      orderBy: { abiertaEn: "desc" },
+      select: {
+        id: true,
+        folio: true,
+        estado: true,
+        fondoInicial: true,
+        totalVendido: true,
+        montoEsperadoEfectivo: true,
+        montoContadoEfectivo: true,
+        diferenciaEfectivo: true,
+        abiertaEn: true,
+        cerradaEn: true,
+        ubicacion: { select: { nombre: true } },
+        abiertaPor: { select: { nombre: true } },
+        cerradaPor: { select: { nombre: true } },
+        _count: { select: { ventas: { where: { estado: "COMPLETADA" } } } },
+      },
+    });
+  },
+
   helpers: { toNum },
 };
