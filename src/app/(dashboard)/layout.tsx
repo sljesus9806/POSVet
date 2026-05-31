@@ -19,6 +19,7 @@ const NAV: Array<NavItem & { permiso?: string }> = [
   { href: "/facturacion", label: "Facturación", iconName: "facturacion", disabled: true, permiso: "facturacion:leer" },
   { href: "/reportes", label: "Reportes", iconName: "reportes", permiso: "reportes:leer" },
   { href: "/usuarios", label: "Usuarios", iconName: "usuarios", permiso: "usuarios:leer" },
+  { href: "/auditoria", label: "Auditoría", iconName: "auditoria", permiso: "auditoria:leer" },
   { href: "/configuracion", label: "Configuración", iconName: "config", permiso: "configuracion:leer" },
 ];
 

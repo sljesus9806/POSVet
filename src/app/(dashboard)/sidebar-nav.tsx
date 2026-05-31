@@ -16,6 +16,7 @@ import {
   Wallet,
   HandCoins,
   UserCog,
+  ScrollText,
   type LucideIcon,
 } from "lucide-react";
 
@@ -39,7 +40,8 @@ export type IconName =
   | "facturacion"
   | "reportes"
   | "usuarios"
-  | "config";
+  | "config"
+  | "auditoria";
 
 const ICONS: Record<IconName, LucideIcon> = {
   home: LayoutDashboard,
@@ -55,6 +57,7 @@ const ICONS: Record<IconName, LucideIcon> = {
   reportes: BarChart3,
   usuarios: UserCog,
   config: Settings,
+  auditoria: ScrollText,
 };
 
 export function SidebarNav({ items }: { items: NavItem[] }) {
