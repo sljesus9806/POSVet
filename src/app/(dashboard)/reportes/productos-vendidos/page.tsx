@@ -17,7 +17,7 @@ import { FiltrosForm } from "../filtros-form";
 import { PrintButton } from "../print-button";
 import { PrintStyles } from "../print-styles";
 import { formatearFecha, resolverRango, type RangoSearchParams } from "../_rango";
-import { PdfLink } from "../_pdf-link";
+import { CsvLink, PdfLink } from "../_pdf-link";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n);
@@ -65,6 +65,11 @@ export default async function ProductosVendidosPage({ searchParams }: { searchPa
         <div className="flex gap-2">
           <PdfLink
             href={`/api/reportes/productos-vendidos/pdf?desde=${rango.desdeStr}&hasta=${rango.hastaStr}${
+              rango.ubicacionId ? `&ubicacionId=${rango.ubicacionId}` : ""
+            }`}
+          />
+          <CsvLink
+            href={`/api/reportes/productos-vendidos/csv?desde=${rango.desdeStr}&hasta=${rango.hastaStr}${
               rango.ubicacionId ? `&ubicacionId=${rango.ubicacionId}` : ""
             }`}
           />
