@@ -21,7 +21,7 @@ import { FiltrosForm } from "../filtros-form";
 import { PrintButton } from "../print-button";
 import { PrintStyles } from "../print-styles";
 import { formatearFecha, resolverRango, type RangoSearchParams } from "../_rango";
-import { PdfLink } from "../_pdf-link";
+import { CsvLink, PdfLink } from "../_pdf-link";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n);
@@ -95,6 +95,7 @@ export default async function VentasDiaPage({
         </div>
         <div className="flex gap-2">
           <PdfLink href={pdfHref} />
+          <CsvLink href={pdfHref.replace("/pdf", "/csv")} />
           <PrintButton />
         </div>
       </div>

@@ -14,7 +14,7 @@ import {
 import { BarOrLineChart, ChartCard } from "@/components/reportes/chart-card";
 import { PrintButton } from "../print-button";
 import { PrintStyles } from "../print-styles";
-import { PdfLink } from "../_pdf-link";
+import { CsvLink, PdfLink } from "../_pdf-link";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n);
@@ -104,6 +104,7 @@ export default async function AntiguedadSaldosPage({
         </div>
         <div className="flex gap-2">
           <PdfLink href={`/api/reportes/antiguedad-saldos/pdf?tipo=${tipo}`} />
+          <CsvLink href={`/api/reportes/antiguedad-saldos/csv?tipo=${tipo}`} />
           <PrintButton />
         </div>
       </div>
