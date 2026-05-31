@@ -1,0 +1,49 @@
+# Stack base del SaaS de POSVet: proxy (Traefik) + Postgres compartido.
+# Cada cliente se levanta como un contenedor aparte que el provisionador
+# (provisionar.mjs) conecta a esta misma red y enruta por subdominio.
+
+name: posvet-saas
+
+services:
+  traefik:
+    image: traefik:v3.1
+    container_name: posvet-traefik
+    restart: unless-stopped
+    # File provider (no socket de Docker): el provisionador escribe un archivo de
+    # ruta por cliente en ./dynamic y Traefik lo observa. Evita la dependencia de
+    # la API de Docker (cuya negociación de versión rompe con daemons nuevos).
+    command:
+      - --providers.file.directory=/dynamic
+      - --providers.file.watch=true
+      - --entrypoints.web.address=:80
+    ports:
+      # http://<cliente>.localhost en el navegador (los *.localhost resuelven a
+      # 127.0.0.1 solos). En el VPS, aquí irá también el :443 con TLS.
+      - "80:80"
+    volumes:
+      - ./dynamic:/dynamic:ro
+    networks:
+      - net
+
+  db:
+    image: postgres:16-alpine
+    container_name: posvet-saas-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: postgres
+    ports:
+      # 5435 para no chocar con el Postgres de dev (5432) ni el de licencias (5434).
+      - "5435:5432"
+    volumes:
+      - saas-db-data:/var/lib/postgresql/data
+    networks:
+      - net
+
+networks:
+  net:
+    name: posvet-saas-net
+
+volumes:
+  saas-db-data:
