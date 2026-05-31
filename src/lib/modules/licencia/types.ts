@@ -9,7 +9,8 @@ export type EstadoLicencia =
   | "invalida"
   | "valida"
   | "gracia"
-  | "expirada";
+  | "expirada"
+  | "revocada"; // la plataforma suspendió/venció la membresía (bloqueo inmediato)
 
 export type ResultadoLicencia = {
   estado: EstadoLicencia;

@@ -63,6 +63,23 @@ export const licenciaService = {
     const lic = parsed.data;
     const expira = new Date(lic.expira);
     const finGracia = new Date(expira.getTime() + lic.gracia * MS_DIA);
+
+    // Revocación remota: la plataforma respondió suspendida/vencida. Bloqueo
+    // inmediato, sin esperar a que expire el token.
+    if (row.revocada) {
+      await licenciaRepository.registrarValidacion(row.id, "revocada");
+      return {
+        estado: "revocada",
+        bloqueado: true,
+        cliente: lic.cliente,
+        modo: lic.modo,
+        expira,
+        finGracia,
+        diasRestantes: Math.ceil((expira.getTime() - now.getTime()) / MS_DIA),
+        mensaje:
+          "El proveedor suspendió esta licencia. Contáctalo para reactivarla.",
+      };
+    }
     const diasRestantes = Math.ceil(
       (expira.getTime() - now.getTime()) / MS_DIA,
     );

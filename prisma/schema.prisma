@@ -877,6 +877,7 @@ model Licencia {
   apiUrl           String? // URL base de la plataforma de licencias
   claveActivacion  String? // secreto del cliente para renovar
   ultimaSync       DateTime? // última vez que se renovó/contactó la plataforma
+  revocada         Boolean   @default(false) // la plataforma respondió suspendida/vencida
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 }

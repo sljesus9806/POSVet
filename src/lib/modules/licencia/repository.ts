@@ -39,10 +39,13 @@ export const licenciaRepository = {
     });
   },
 
-  marcarSync(id: string) {
+  // Registra el contacto con la plataforma. `revocada` refleja el veredicto:
+  // true si respondió suspendida/vencida, false si renovó OK. En fallo de red
+  // no se llama (se deja el estado anterior).
+  marcarSync(id: string, revocada: boolean) {
     return prisma.licencia.update({
       where: { id },
-      data: { ultimaSync: new Date() },
+      data: { ultimaSync: new Date(), revocada },
     });
   },
 };

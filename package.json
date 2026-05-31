@@ -18,7 +18,8 @@
     "lic:keygen": "tsx scripts/licencia/keygen.ts",
     "lic:emitir": "tsx scripts/licencia/emitir.ts",
     "lic:instalar": "tsx scripts/licencia/instalar.ts",
-    "lic:activar": "tsx scripts/licencia/activar.ts"
+    "lic:activar": "tsx scripts/licencia/activar.ts",
+    "lic:sync": "tsx scripts/licencia/sync.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

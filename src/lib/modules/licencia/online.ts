@@ -1,7 +1,9 @@
 // Cliente del modo online: POSVet "llama a casa" (la plataforma de licencias)
-// para activarse y renovar su token cada cierto tiempo. Todo es tolerante a
-// fallos: si no hay internet o la plataforma no responde, NO se bloquea nada;
-// el token vigente sigue valiendo hasta que expire (gracia incluida).
+// para activarse y renovar su token cada cierto tiempo. Es tolerante a fallos:
+// si no hay internet o la plataforma no responde, NO se bloquea nada; el token
+// vigente sigue valiendo hasta que expire (gracia incluida). En cambio, si la
+// plataforma responde explícitamente "suspendida/vencida" (402), se marca como
+// revocada y el bloqueo es inmediato.
 
 import { licenciaRepository } from "./repository";
 import { licenciaService } from "./service";
@@ -101,18 +103,20 @@ export async function sincronizar(
     if (status === 200) {
       const token = (json as { token?: string } | null)?.token;
       if (token) await licenciaService.instalar(token, row.instalacion);
-      await licenciaRepository.marcarSync(row.id);
+      // Renovó OK: limpia cualquier revocación previa.
+      await licenciaRepository.marcarSync(row.id, false);
       return { ok: true, motivo: "renovada" };
     }
 
     if (status === 402) {
-      // Membresía suspendida/vencida: no renovamos. El token actual seguirá
-      // hasta vencer → gracia → bloqueo. Registramos el contacto igual.
-      await licenciaRepository.marcarSync(row.id);
+      // Membresía suspendida/vencida: la plataforma dice "no". Marcamos revocada
+      // → el gate bloquea de inmediato (no esperamos a que el token expire).
+      await licenciaRepository.marcarSync(row.id, true);
       const estado = (json as { estado?: string } | null)?.estado;
       return { ok: true, motivo: "membresia_inactiva", estado };
     }
 
+    // Otros códigos (5xx, etc.): no concluyente, no revocamos.
     return { ok: false, motivo: `http_${status}` };
   } catch {
     // Sin conexión / timeout: tolerante, no bloquea.
