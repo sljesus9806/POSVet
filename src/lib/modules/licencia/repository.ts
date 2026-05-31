@@ -28,4 +28,21 @@ export const licenciaRepository = {
       data: { ultimaValidacion: new Date(), ultimoEstado: estado },
     });
   },
+
+  guardarConfigOnline(
+    instalacion: string,
+    config: { apiUrl: string; claveActivacion: string },
+  ) {
+    return prisma.licencia.update({
+      where: { instalacion },
+      data: config,
+    });
+  },
+
+  marcarSync(id: string) {
+    return prisma.licencia.update({
+      where: { id },
+      data: { ultimaSync: new Date() },
+    });
+  },
 };

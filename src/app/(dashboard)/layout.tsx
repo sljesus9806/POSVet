@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { Stethoscope, LogOut, AlertTriangle } from "lucide-react";
 import { auth } from "@/auth";
 import { hasPermission, type SessionUser } from "@/lib/auth-helpers";
-import { licenciaService } from "@/lib/modules/licencia";
+import { licenciaService, sincronizar } from "@/lib/modules/licencia";
 import { Button } from "@/components/ui/button";
 import { logoutAction } from "./actions";
 import { SidebarNav, type NavItem } from "./sidebar-nav";
@@ -55,6 +56,14 @@ export default async function DashboardLayout({
     process.env.NODE_ENV !== "production" &&
     process.env.LICENCIA_DEV_BYPASS === "1";
   if (licencia.bloqueado && !bypassLicencia) redirect("/licencia");
+
+  // Modo online: renovar token en segundo plano (post-respuesta, no bloquea el
+  // render). Auto-limitado a 1 vez/6h y tolerante a fallos de red.
+  if (licencia.modo === "online") {
+    after(async () => {
+      await sincronizar();
+    });
+  }
 
   const user = session.user as SessionUser;
   const visibleNav: NavItem[] = NAV.filter(
