@@ -2,6 +2,10 @@ import { redirect } from "next/navigation";
 import { ShieldAlert } from "lucide-react";
 import { licenciaService } from "@/lib/modules/licencia";
 
+// Consulta la BD (estado de licencia) en cada request: no debe prerenderizarse
+// en build (no hay BD durante `next build`).
+export const dynamic = "force-dynamic";
+
 // Pantalla de bloqueo a página completa (fuera del layout del dashboard, sin
 // sidebar). Solo se muestra cuando la licencia está expirada/ausente/inválida;
 // si la licencia está vigente o en gracia, redirige de vuelta al sistema.
