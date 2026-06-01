@@ -46,6 +46,24 @@ node deploy/desprovisionar.mjs serengueti            # detiene; conserva la BD
 node deploy/desprovisionar.mjs serengueti --purge    # además BORRA la BD
 ```
 
+Elimina el contenedor, la ruta de Traefik y el secreto de la tienda.
+
+### Respaldos
+
+Cada tienda guarda sus datos en su BD `pos_<slug>` (dentro del volumen
+`posvet-saas_saas-db-data`). Para respaldar/restaurar:
+
+```bash
+node deploy/respaldar.mjs serengueti      # respalda una tienda
+node deploy/respaldar.mjs --all           # respalda todas
+# → archivos en deploy/backups/<bd>-<fecha>.dump
+
+# restaurar (DESTRUCTIVO: reemplaza la BD de esa tienda)
+node deploy/restaurar.mjs serengueti deploy/backups/pos_serengueti-....dump
+```
+
+Para respaldos automáticos, agenda `respaldar.mjs --all` en un cron.
+
 ## Cómo se gana acceso desde internet (siguiente paso)
 
 Para que **tienda y bodega** de serengueti entren desde sus locales, la instancia
