@@ -32,7 +32,10 @@ const purge = process.argv.includes("--purge");
 await run("docker", ["rm", "-f", `posvet-${slug}`]);
 const ruta = path.join(DEPLOY_DIR, "dynamic", `${slug}.yml`);
 if (existsSync(ruta)) rmSync(ruta);
-console.log(`Contenedor y ruta de ${slug} eliminados.`);
+// Limpia también el secreto de sesión de la tienda (antes quedaba huérfano).
+const secreto = path.join(DEPLOY_DIR, "tenants", `${slug}.secret`);
+if (existsSync(secreto)) rmSync(secreto);
+console.log(`Contenedor, ruta y secreto de ${slug} eliminados.`);
 
 if (purge) {
   await run("docker", [

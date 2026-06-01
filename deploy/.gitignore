@@ -1,3 +1,4 @@
 .env
 tenants/
 dynamic/*.yml
+backups/
