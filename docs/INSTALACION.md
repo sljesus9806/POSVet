@@ -76,7 +76,7 @@ cd deploy && docker compose up -d && cd ..
 ### Crear un cliente — Opción A: por comando
 
 ```bash
-node deploy/provisionar.mjs serengueti --nombre "Veterinaria Serengueti"
+node deploy/provisionar.mjs serengueti --nombre "Tienda Serengueti"
 # → http://serengueti.localhost   (admin@posvet.local / admin12345)
 ```
 

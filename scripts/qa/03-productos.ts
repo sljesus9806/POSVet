@@ -17,7 +17,7 @@ export async function run(): Promise<void> {
   eq(catEdit.nombre, "Suplementos QA 2", "categoría renombrada");
 
   // PRD-02 — medicamento completo + 3 precios
-  caso("PRD-02", "crear medicamento (IVA, receta, controlada, lab, vía) + precios PUBLICO/MAYOREO/VETERINARIO");
+  caso("PRD-02", "crear medicamento (IVA, receta, controlada, lab, vía) + precios PUBLICO/MAYOREO/DISTRIBUIDOR");
   const med = await productosService.crear(
     {
       sku: "MED-QA-001",
@@ -34,7 +34,7 @@ export async function run(): Promise<void> {
       precios: [
         { tipo: "PUBLICO", precio: 116 },
         { tipo: "MAYOREO", precio: 100 },
-        { tipo: "VETERINARIO", precio: 92.8 },
+        { tipo: "DISTRIBUIDOR", precio: 92.8 },
       ],
     },
     { usuarioId },

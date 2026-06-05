@@ -68,8 +68,7 @@ export function ClienteForm({ cliente }: { cliente?: ClienteDetalle }) {
             >
               <option value="PUBLICO">Público general</option>
               <option value="MAYOREO">Mayoreo</option>
-              <option value="VETERINARIO">Veterinario afiliado</option>
-              <option value="GRANJA">Granja</option>
+              <option value="DISTRIBUIDOR">Distribuidor</option>
             </select>
           </div>
           <div>
@@ -83,10 +82,10 @@ export function ClienteForm({ cliente }: { cliente?: ClienteDetalle }) {
               <option value="">Derivar del tipo</option>
               <option value="PUBLICO">PUBLICO</option>
               <option value="MAYOREO">MAYOREO</option>
-              <option value="VETERINARIO">VETERINARIO</option>
+              <option value="DISTRIBUIDOR">DISTRIBUIDOR</option>
             </select>
             <p className="text-xs text-muted-foreground mt-1">
-              Si lo dejas en blanco, se usa el precio del tipo (GRANJA → mayoreo).
+              Si lo dejas en blanco, se usa el precio del tipo de cliente.
             </p>
           </div>
           <div>

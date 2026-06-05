@@ -93,7 +93,7 @@ export async function run(): Promise<void> {
   );
   S.ventaCreditoId = venta7.id;
   S.ventaCreditoTotal = venta7.total;
-  eq(venta7.total, 155, "precio VETERINARIO de iver = 155");
+  eq(venta7.total, 155, "precio DISTRIBUIDOR de iver = 155");
   const venta7Db = await prisma.venta.findUnique({ where: { id: venta7.id } });
   eq(num(venta7Db?.saldoCredito), 155, "saldoCredito de la venta = 155");
   eq(num(venta7Db?.montoCredito), 155, "montoCredito de la venta = 155");
@@ -107,15 +107,15 @@ export async function run(): Promise<void> {
     { usuarioId },
   );
   eq(venta8.tipoPrecio, "MAYOREO", "tipoPrecio MAYOREO");
-  eq(venta8.lineas[0].precioUnitario, 820, "precio MAYOREO del alimento canino = 820");
+  eq(venta8.lineas[0].precioUnitario, 820, "precio MAYOREO del producto = 820");
 
   // VEN-09 ✗ — caminos de error
   caso("VEN-09", "pago insuficiente / cambio no-efectivo / stock insuficiente / crédito excede / sin precio");
   await lanza("PagoInsuficienteError", () => ventasService.crearVenta({ cajaId: caja.id, lineas: [{ productoId: amox.id, cantidad: 1 }], pagos: [{ forma: "EFECTIVO", monto: 100 }] }, { usuarioId }), "pago insuficiente");
   await lanza("CambioSoloEfectivoError", () => ventasService.crearVenta({ cajaId: caja.id, lineas: [{ productoId: amox.id, cantidad: 1 }], pagos: [{ forma: "TARJETA", monto: 200 }] }, { usuarioId }), "cambio con tarjeta");
-  await lanza("StockInsuficienteError", () => ventasService.crearVenta({ cajaId: caja.id, lineas: [{ productoId: felino.id, cantidad: 10 }], pagos: [{ forma: "EFECTIVO", monto: 5400 }] }, { usuarioId }), "stock insuficiente (felino)");
+  await lanza("StockInsuficienteError", () => ventasService.crearVenta({ cajaId: caja.id, lineas: [{ productoId: felino.id, cantidad: 10 }], pagos: [{ forma: "EFECTIVO", monto: 5400 }] }, { usuarioId }), "stock insuficiente");
   await lanza("CreditoExcedeLineaError", () => ventasService.crearVenta({ cajaId: caja.id, clienteId: S.clienteCreditoChicoId, lineas: [{ productoId: iver.id, cantidad: 1 }], pagos: [{ forma: "CREDITO", monto: 155 }] }, { usuarioId }), "crédito 155 excede línea 100");
-  const sinPrecio = await productosService.crear({ sku: "SINPREC-QA-001", nombre: "Sin precio público QA", unidadMedida: "PZA", tipo: "ACCESORIO", precios: [{ tipo: "VETERINARIO", precio: 100 }] }, { usuarioId });
+  const sinPrecio = await productosService.crear({ sku: "SINPREC-QA-001", nombre: "Sin precio público QA", unidadMedida: "PZA", tipo: "ACCESORIO", precios: [{ tipo: "DISTRIBUIDOR", precio: 100 }] }, { usuarioId });
   await lanza("ProductoSinPrecioError", () => ventasService.crearVenta({ cajaId: caja.id, lineas: [{ productoId: sinPrecio.id, cantidad: 1 }], pagos: [{ forma: "EFECTIVO", monto: 100 }] }, { usuarioId }), "producto sin precio para el tipo");
 
   // VEN-10 — cancelar venta

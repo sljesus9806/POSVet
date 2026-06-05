@@ -3,8 +3,8 @@ import { z } from "zod";
 // RFC mexicano: 12 (persona moral) o 13 (persona física) caracteres alfanuméricos.
 const rfcRegex = /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/;
 
-export const tipoClienteSchema = z.enum(["PUBLICO", "MAYOREO", "VETERINARIO", "GRANJA"]);
-export const tipoPrecioSchema = z.enum(["PUBLICO", "MAYOREO", "VETERINARIO"]);
+export const tipoClienteSchema = z.enum(["PUBLICO", "MAYOREO", "DISTRIBUIDOR"]);
+export const tipoPrecioSchema = z.enum(["PUBLICO", "MAYOREO", "DISTRIBUIDOR"]);
 
 const opt = (max: number) =>
   z

@@ -6,20 +6,18 @@ export async function run(): Promise<void> {
   console.log("\n== 5.6 Clientes ==");
   const usuarioId = await adminId();
 
-  // CLI-01 — 4 tipos; uno con crédito, otro sin
-  caso("CLI-01", "crear PUBLICO, MAYOREO, VETERINARIO (con crédito) y GRANJA");
+  // CLI-01 — 3 tipos; uno con crédito, otro sin
+  caso("CLI-01", "crear PUBLICO, MAYOREO y DISTRIBUIDOR (con crédito)");
   const publico = await clientesService.crear({ nombre: "Cliente Público QA", tipoCliente: "PUBLICO", lineaCredito: 0, diasCredito: 0 }, { usuarioId });
   const mayoreo = await clientesService.crear({ nombre: "Mayorista QA", tipoCliente: "MAYOREO", lineaCredito: 0, diasCredito: 0 }, { usuarioId });
-  const vet = await clientesService.crear({ nombre: "Clínica Vet QA", tipoCliente: "VETERINARIO", lineaCredito: 5000, diasCredito: 30 }, { usuarioId });
-  const granja = await clientesService.crear({ nombre: "Granja QA", tipoCliente: "GRANJA", lineaCredito: 0, diasCredito: 0 }, { usuarioId });
-  const credChico = await clientesService.crear({ nombre: "Cliente Crédito Chico QA", tipoCliente: "VETERINARIO", lineaCredito: 100, diasCredito: 15 }, { usuarioId });
+  const dist = await clientesService.crear({ nombre: "Distribuidor QA", tipoCliente: "DISTRIBUIDOR", lineaCredito: 5000, diasCredito: 30 }, { usuarioId });
+  const credChico = await clientesService.crear({ nombre: "Cliente Crédito Chico QA", tipoCliente: "DISTRIBUIDOR", lineaCredito: 100, diasCredito: 15 }, { usuarioId });
   S.clientePublicoId = publico.id;
   S.clienteMayoreoId = mayoreo.id;
-  S.clienteCreditoId = vet.id;
+  S.clienteCreditoId = dist.id;
   S.clienteCreditoChicoId = credChico.id;
-  eq(vet.lineaCredito, 5000, "VETERINARIO con línea 5000");
-  eq(vet.tipoPrecioEfectivo, "VETERINARIO", "tipo de precio efectivo VETERINARIO");
-  eq(granja.tipoPrecioEfectivo, "MAYOREO", "GRANJA mapea a precio MAYOREO");
+  eq(dist.lineaCredito, 5000, "DISTRIBUIDOR con línea 5000");
+  eq(dist.tipoPrecioEfectivo, "DISTRIBUIDOR", "tipo de precio efectivo DISTRIBUIDOR");
   eq(publico.lineaCredito, 0, "PUBLICO sin crédito");
 
   // CLI-02 — datos fiscales completos
@@ -34,10 +32,10 @@ export async function run(): Promise<void> {
 
   // CLI-03 — listar (filtros) y obtener
   caso("CLI-03", "listar con filtro por tipo y obtener");
-  const soloVet = await clientesService.listar({ tipo: "VETERINARIO" });
-  check(soloVet.length >= 2 && soloVet.every((c) => c.tipoCliente === "VETERINARIO"), `filtro tipo VETERINARIO (${soloVet.length})`);
-  const det = await clientesService.obtener(vet.id);
-  eq(det?.id, vet.id, "obtener por id");
+  const soloDist = await clientesService.listar({ tipo: "DISTRIBUIDOR" });
+  check(soloDist.length >= 2 && soloDist.every((c) => c.tipoCliente === "DISTRIBUIDOR"), `filtro tipo DISTRIBUIDOR (${soloDist.length})`);
+  const det = await clientesService.obtener(dist.id);
+  eq(det?.id, dist.id, "obtener por id");
 
   // CLI-04 — actualizar y baja lógica
   caso("CLI-04", "actualizar y baja lógica (activo=false, no se borra)");

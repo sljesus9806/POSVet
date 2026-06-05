@@ -192,7 +192,7 @@ enum TipoProducto {
 enum TipoPrecio {
   PUBLICO
   MAYOREO
-  VETERINARIO
+  DISTRIBUIDOR
 }
 
 model Categoria {
@@ -381,8 +381,7 @@ model TransferenciaLinea {
 enum TipoCliente {
   PUBLICO
   MAYOREO
-  VETERINARIO
-  GRANJA
+  DISTRIBUIDOR
 }
 
 model Cliente {

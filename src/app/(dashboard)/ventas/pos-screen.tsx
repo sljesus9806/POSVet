@@ -17,7 +17,7 @@ type ClienteOpcion = {
   id: string;
   codigo: string;
   nombre: string;
-  tipoCliente: "PUBLICO" | "MAYOREO" | "VETERINARIO" | "GRANJA";
+  tipoCliente: "PUBLICO" | "MAYOREO" | "DISTRIBUIDOR";
   tipoPrecioEfectivo: TipoPrecio;
   rfc: string | null;
   lineaCredito: number;

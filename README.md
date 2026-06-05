@@ -1,10 +1,10 @@
-# POSVet — Punto de Venta Veterinaria
+# Ligerito — Punto de Venta
 
-Sistema de Punto de Venta con facturación CFDI 4.0 y cobranza para una tienda
-veterinaria con bodega anexa. Diseñado para crecer de 1 tienda a 3-5 sucursales
-sin reescribirse.
+Sistema de Punto de Venta con inventario, facturación CFDI 4.0 y cobranza para
+cualquier giro (abarrotes, farmacia, veterinaria, papelería…) con bodega anexa.
+Diseñado para crecer de 1 tienda a 3-5 sucursales sin reescribirse.
 
-> Especificación técnica completa en [`docs/POS-Veterinaria-Especificacion.md`](./docs/POS-Veterinaria-Especificacion.md).
+> Especificación técnica completa en [`docs/Especificacion-Tecnica.md`](./docs/Especificacion-Tecnica.md).
 
 ## Stack
 

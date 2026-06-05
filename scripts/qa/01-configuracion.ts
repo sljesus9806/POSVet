@@ -9,12 +9,12 @@ export async function run(): Promise<void> {
   // CFG-01
   caso("CFG-01", "obtenerEmpresaPrincipal devuelve la empresa del seed");
   const empresa = await configuracionService.obtenerEmpresaPrincipal();
-  check(!!empresa && empresa.razonSocial.includes("POSVet"), empresa?.razonSocial);
+  check(!!empresa && empresa.razonSocial.includes("Mi Negocio"), empresa?.razonSocial);
   S.empresaId = empresa?.id ?? SEED.empresaId;
 
   // CFG-02
   caso("CFG-02", "actualizarEmpresa persiste + escribe AuditLog");
-  const nuevaRazon = "POSVet Veterinaria Demo SA de CV (QA)";
+  const nuevaRazon = "Mi Negocio Demo SA de CV (QA)";
   const actualizada = await configuracionService.actualizarEmpresa(
     {
       id: S.empresaId,

@@ -35,8 +35,8 @@ function formatZod(err: z.ZodError): FormState {
 export async function crearProductoAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const user = await requirePermission("productos:crear");
 
-  const precios: Array<{ tipo: "PUBLICO" | "MAYOREO" | "VETERINARIO"; precio: number }> = [];
-  for (const tipo of ["PUBLICO", "MAYOREO", "VETERINARIO"] as const) {
+  const precios: Array<{ tipo: "PUBLICO" | "MAYOREO" | "DISTRIBUIDOR"; precio: number }> = [];
+  for (const tipo of ["PUBLICO", "MAYOREO", "DISTRIBUIDOR"] as const) {
     const p = parseNumber(formData.get(`precio_${tipo}`));
     if (p !== undefined && p > 0) precios.push({ tipo, precio: p });
   }
@@ -91,8 +91,8 @@ export async function actualizarProductoAction(_prev: FormState, formData: FormD
   const id = String(formData.get("id") ?? "");
   if (!id) return { ok: false, error: "Falta el id del producto" };
 
-  const precios: Array<{ tipo: "PUBLICO" | "MAYOREO" | "VETERINARIO"; precio: number }> = [];
-  for (const tipo of ["PUBLICO", "MAYOREO", "VETERINARIO"] as const) {
+  const precios: Array<{ tipo: "PUBLICO" | "MAYOREO" | "DISTRIBUIDOR"; precio: number }> = [];
+  for (const tipo of ["PUBLICO", "MAYOREO", "DISTRIBUIDOR"] as const) {
     const raw = formData.get(`precio_${tipo}`);
     if (raw !== null && raw !== "") {
       const p = parseNumber(raw);

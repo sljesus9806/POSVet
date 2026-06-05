@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "POSVet — Punto de Venta Veterinaria",
-  description: "Sistema POS con facturación y cobranza para tienda veterinaria",
+  title: "Ligerito — Punto de Venta",
+  description: "Sistema de punto de venta con inventario, facturación y cobranza para cualquier giro",
 };
 
 export default function RootLayout({

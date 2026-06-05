@@ -14,7 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-const TIPOS = ["TODOS", "PUBLICO", "MAYOREO", "VETERINARIO", "GRANJA"] as const;
+const TIPOS = ["TODOS", "PUBLICO", "MAYOREO", "DISTRIBUIDOR"] as const;
 
 type SearchParams = Promise<{ q?: string; tipo?: string; soloActivos?: string }>;
 

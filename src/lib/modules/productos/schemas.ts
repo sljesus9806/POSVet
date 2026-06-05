@@ -9,7 +9,7 @@ export const tipoProductoSchema = z.enum([
   "SERVICIO",
 ]);
 
-export const tipoPrecioSchema = z.enum(["PUBLICO", "MAYOREO", "VETERINARIO"]);
+export const tipoPrecioSchema = z.enum(["PUBLICO", "MAYOREO", "DISTRIBUIDOR"]);
 
 export const precioInputSchema = z.object({
   tipo: tipoPrecioSchema,

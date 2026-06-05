@@ -28,7 +28,7 @@ export default async function TicketPage({ params }: { params: Params }) {
       `}</style>
       <div className="ticket mx-auto max-w-[80mm] bg-white text-black font-mono text-[11px] leading-snug p-2">
         <header className="text-center space-y-0.5">
-          <div className="font-bold text-sm">{empresa?.razonSocial ?? "POSVet"}</div>
+          <div className="font-bold text-sm">{empresa?.razonSocial ?? "Ligerito"}</div>
           {empresa?.rfc && <div>RFC: {empresa.rfc}</div>}
           {empresa?.direccion && <div>{empresa.direccion}</div>}
           {empresa?.telefono && <div>Tel: {empresa.telefono}</div>}
