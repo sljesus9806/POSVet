@@ -29,9 +29,7 @@ export class CodigoClienteDuplicadoError extends Error {
 const MAPA_TIPO_PRECIO: Record<TipoCliente, TipoPrecio> = {
   PUBLICO: "PUBLICO",
   MAYOREO: "MAYOREO",
-  VETERINARIO: "VETERINARIO",
-  // GRANJA suele comprar volumen → mayoreo (ajustable luego).
-  GRANJA: "MAYOREO",
+  DISTRIBUIDOR: "DISTRIBUIDOR",
 };
 
 export function tipoPrecioEfectivo(c: { tipoCliente: TipoCliente; tipoPrecio: TipoPrecio | null }): TipoPrecio {

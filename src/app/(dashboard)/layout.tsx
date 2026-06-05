@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { Stethoscope, LogOut, AlertTriangle } from "lucide-react";
+import { Store, LogOut, AlertTriangle } from "lucide-react";
 import { auth } from "@/auth";
 import { hasPermission, type SessionUser } from "@/lib/auth-helpers";
 import { licenciaService, sincronizar } from "@/lib/modules/licencia";
@@ -83,10 +83,10 @@ export default async function DashboardLayout({
       <aside className="w-64 shrink-0 border-r bg-card flex flex-col">
         <div className="h-16 px-5 flex items-center gap-2.5 border-b">
           <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
-            <Stethoscope className="size-5" />
+            <Store className="size-5" />
           </span>
           <div className="leading-none">
-            <p className="font-semibold text-base tracking-tight">POSVet</p>
+            <p className="font-semibold text-base tracking-tight">Ligerito</p>
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider mt-0.5">
               Punto de venta
             </p>

@@ -12,7 +12,7 @@ export async function run(): Promise<void> {
   // PRO-01
   caso("PRO-01", "crear proveedor con datos fiscales; listar; obtener");
   const prov = await proveedoresService.crear(
-    { nombre: "Distribuidora Veterinaria QA", rfc: "DVQ960101AB1", regimenFiscal: "601", codigoPostal: "06700", email: "ventas@dvqa.mx", telefono: "5512345678", contacto: "Juan Pérez", diasCredito: 30 },
+    { nombre: "Distribuidora General QA", rfc: "DVQ960101AB1", regimenFiscal: "601", codigoPostal: "06700", email: "ventas@dvqa.mx", telefono: "5512345678", contacto: "Juan Pérez", diasCredito: 30 },
     { usuarioId },
   );
   S.proveedorId = prov.id;
@@ -20,7 +20,7 @@ export async function run(): Promise<void> {
   const lista = await proveedoresService.listar();
   check(lista.some((p) => p.id === prov.id), "aparece en listar");
   const obtenido = await proveedoresService.obtener(prov.id);
-  eq(obtenido?.nombre, "Distribuidora Veterinaria QA", "obtener por id");
+  eq(obtenido?.nombre, "Distribuidora General QA", "obtener por id");
 
   // PRO-02
   caso("PRO-02", "actualizar (condiciones de pago, contacto) → persiste + audit");

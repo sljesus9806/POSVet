@@ -36,8 +36,16 @@ export function ProductoForm({ categorias, producto }: Props) {
   const action = isEdit ? actualizarProductoAction : crearProductoAction;
   const [state, formAction] = useActionState(action, initial);
 
-  const precio = (tipo: "PUBLICO" | "MAYOREO" | "VETERINARIO") =>
+  const precio = (tipo: "PUBLICO" | "MAYOREO" | "DISTRIBUIDOR") =>
     producto?.precios.find((p) => p.tipo === tipo)?.precio ?? "";
+
+  const tieneEspecializados = !!(
+    producto?.especie ||
+    producto?.laboratorio ||
+    producto?.viaAdministracion ||
+    producto?.requiereReceta ||
+    producto?.sustanciaControlada
+  );
 
   return (
     <form action={formAction} className="space-y-6">
@@ -59,7 +67,7 @@ export function ProductoForm({ categorias, producto }: Props) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Label htmlFor="sku">SKU</Label>
-            <Input id="sku" name="sku" defaultValue={producto?.sku} required placeholder="MED-AMOX-500" />
+            <Input id="sku" name="sku" defaultValue={producto?.sku} required placeholder="ABC-001" />
             <Err msgs={state.fieldErrors?.sku} />
           </div>
           <div>
@@ -87,12 +95,12 @@ export function ProductoForm({ categorias, producto }: Props) {
             <select
               id="tipo"
               name="tipo"
-              defaultValue={producto?.tipo ?? "MEDICAMENTO"}
+              defaultValue={producto?.tipo ?? "ACCESORIO"}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             >
-              <option value="MEDICAMENTO">Medicamento</option>
+              <option value="ACCESORIO">Artículo / Accesorio</option>
               <option value="ALIMENTO">Alimento</option>
-              <option value="ACCESORIO">Accesorio</option>
+              <option value="MEDICAMENTO">Medicamento</option>
               <option value="SERVICIO">Servicio</option>
             </select>
           </div>
@@ -117,19 +125,54 @@ export function ProductoForm({ categorias, producto }: Props) {
             <Input id="unidadMedida" name="unidadMedida" defaultValue={producto?.unidadMedida ?? "PZA"} required />
           </div>
           <div>
-            <Label htmlFor="especie">Especie</Label>
-            <Input id="especie" name="especie" defaultValue={producto?.especie ?? ""} placeholder="Canino, Felino…" />
-          </div>
-          <div>
             <Label htmlFor="marca">Marca</Label>
             <Input id="marca" name="marca" defaultValue={producto?.marca ?? ""} />
+          </div>
+        </div>
+        {isEdit && (
+          <label className="flex items-center gap-2 text-sm pt-2">
+            <input
+              type="checkbox"
+              name="activo"
+              defaultChecked={producto?.activo ?? true}
+              className="size-4"
+            />
+            Activo
+          </label>
+        )}
+      </section>
+
+      <details open={tieneEspecializados} className="rounded-lg border bg-card p-5">
+        <summary className="font-semibold cursor-pointer select-none">
+          Campos especializados{" "}
+          <span className="text-xs font-normal text-muted-foreground">
+            — farmacia / veterinaria (opcionales)
+          </span>
+        </summary>
+        <p className="text-xs text-muted-foreground mt-3 mb-4">
+          Complétalos solo si tu giro lo necesita (medicamentos, insumos
+          veterinarios). Para abarrotes u otros giros, déjalos vacíos.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <Label htmlFor="especie">Especie</Label>
+            <Input id="especie" name="especie" defaultValue={producto?.especie ?? ""} placeholder="Canino, Felino…" />
           </div>
           <div>
             <Label htmlFor="laboratorio">Laboratorio</Label>
             <Input id="laboratorio" name="laboratorio" defaultValue={producto?.laboratorio ?? ""} />
           </div>
+          <div>
+            <Label htmlFor="viaAdministracion">Vía de administración</Label>
+            <Input
+              id="viaAdministracion"
+              name="viaAdministracion"
+              defaultValue={producto?.viaAdministracion ?? ""}
+              placeholder="Oral, inyectable, tópica…"
+            />
+          </div>
         </div>
-        <div className="flex flex-wrap gap-6 pt-2">
+        <div className="flex flex-wrap gap-6 pt-4">
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
@@ -148,30 +191,8 @@ export function ProductoForm({ categorias, producto }: Props) {
             />
             Sustancia controlada (COFEPRIS)
           </label>
-          {isEdit && (
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                name="activo"
-                defaultChecked={producto?.activo ?? true}
-                className="size-4"
-              />
-              Activo
-            </label>
-          )}
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="viaAdministracion">Vía de administración</Label>
-            <Input
-              id="viaAdministracion"
-              name="viaAdministracion"
-              defaultValue={producto?.viaAdministracion ?? ""}
-              placeholder="Oral, inyectable, tópica…"
-            />
-          </div>
-        </div>
-      </section>
+      </details>
 
       <section className="rounded-lg border bg-card p-5 space-y-4">
         <h3 className="font-semibold">Fiscal y costos</h3>
@@ -212,7 +233,7 @@ export function ProductoForm({ categorias, producto }: Props) {
           Deja en blanco los que no apliquen. PUBLICO es el precio default mostrado en el listado.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {(["PUBLICO", "MAYOREO", "VETERINARIO"] as const).map((tipo) => (
+          {(["PUBLICO", "MAYOREO", "DISTRIBUIDOR"] as const).map((tipo) => (
             <div key={tipo}>
               <Label htmlFor={`precio_${tipo}`}>{tipo}</Label>
               <Input

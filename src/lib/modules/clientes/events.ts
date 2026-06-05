@@ -10,7 +10,7 @@ export type ClienteCreadoPayload = {
   clienteId: string;
   codigo: string;
   nombre: string;
-  tipoCliente: "PUBLICO" | "MAYOREO" | "VETERINARIO" | "GRANJA";
+  tipoCliente: "PUBLICO" | "MAYOREO" | "DISTRIBUIDOR";
   usuarioId: string;
 };
 

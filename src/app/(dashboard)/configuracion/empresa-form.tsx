@@ -81,7 +81,7 @@ export function EmpresaForm({ empresa }: { empresa: EmpresaDetalle }) {
               name="razonSocial"
               defaultValue={empresa.razonSocial}
               required
-              placeholder="Mi Veterinaria SA de CV"
+              placeholder="Mi Negocio SA de CV"
             />
             <Err msgs={state.fieldErrors?.razonSocial} />
           </div>

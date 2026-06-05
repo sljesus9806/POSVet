@@ -11,7 +11,7 @@ function hoyRango() {
 export async function run(): Promise<void> {
   console.log("\n== 5.11 Reportes ==");
   const { desde, hasta } = hoyRango();
-  const empresa = { razonSocial: "POSVet Veterinaria Demo SA de CV", rfc: "XAXX010101000" };
+  const empresa = { razonSocial: "Mi Negocio Demo SA de CV", rfc: "XAXX010101000" };
 
   // REP-01 — cross-check EXACTO contra la BD cruda (completadas vs canceladas en rango)
   caso("REP-01", "ventasDelDia: total/tickets/ticket promedio/por forma de pago (cross-check exacto vs BD)");

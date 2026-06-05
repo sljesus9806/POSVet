@@ -1,4 +1,4 @@
-# POS Veterinaria — Especificación Técnica
+# Ligerito — Especificación Técnica
 
 **Sistema de Punto de Venta con Facturación y Cobranza**
 Versión 1.0 — Diseño modular para tienda + bodega
@@ -7,7 +7,7 @@ Versión 1.0 — Diseño modular para tienda + bodega
 
 ## 1. Resumen ejecutivo
 
-Sistema web modular para una tienda de productos veterinarios con bodega anexa, diseñado para crecer sin reescribirse. El sistema debe permitir vender, controlar inventario en dos ubicaciones (tienda y bodega), gestionar clientes con crédito, emitir facturas CFDI 4.0 al SAT, y operarse por personal con conocimientos básicos en tecnología.
+Sistema web modular para cualquier giro (abarrotes, farmacia, veterinaria, papelería…) con bodega anexa, diseñado para crecer sin reescribirse. El sistema debe permitir vender, controlar inventario en dos ubicaciones (tienda y bodega), gestionar clientes con crédito, emitir facturas CFDI 4.0 al SAT, y operarse por personal con conocimientos básicos en tecnología.
 
 **Stack elegido:**
 - Frontend: Next.js 14+ (App Router) + TypeScript + Tailwind CSS + shadcn/ui
@@ -63,7 +63,7 @@ Sistema web modular para una tienda de productos veterinarios con bodega anexa, 
 ### 2.2 Estructura de carpetas (monorepo simple)
 
 ```
-pos-veterinaria/
+ligerito/
 ├── apps/
 │   └── web/                          # Aplicación Next.js
 │       ├── app/
@@ -165,13 +165,13 @@ lib/modules/<modulo>/
 **Funcionalidad clave:**
 - Alta/edición/baja lógica de clientes (nunca se borra, solo se desactiva)
 - Datos fiscales completos para CFDI: RFC, razón social, régimen fiscal, uso de CFDI, código postal
-- Tipos de cliente: público general, mayoreo, veterinario afiliado, granja
+- Tipos de cliente: público general, mayoreo, distribuidor
 - Asignación de listas de precios por tipo
 - Línea de crédito: monto máximo, días de plazo, alerta al vencer
 - Estado de cuenta: ventas a crédito, pagos recibidos, saldo actual
 - Registro de pagos (abonos) con aplicación a facturas/notas específicas
 - Bloqueo automático si excede crédito o tiene facturas vencidas (con override del admin)
-- Historial completo de compras (qué mascota, qué medicamento, fechas) — útil para upsell
+- Historial completo de compras (qué producto, fechas) — útil para upsell
 
 **Eventos:**
 - `cliente.creado`, `cliente.actualizado`
@@ -218,7 +218,7 @@ lib/modules/<modulo>/
 
 **Funcionalidad clave:**
 - Catálogo con: SKU, código de barras, nombre, descripción, marca, categoría, unidad de medida
-- **Campos veterinarios específicos:**
+- **Campos especializados (opcionales, p.ej. farmacia / veterinaria):**
   - Tipo: medicamento / alimento / accesorio / servicio
   - Especie objetivo (perro, gato, bovino, equino, aviar, etc.)
   - Requiere receta médica (sí/no)
@@ -226,7 +226,7 @@ lib/modules/<modulo>/
   - Lote y caducidad (obligatorio para medicamentos y alimentos)
   - Laboratorio fabricante
   - Vía de administración
-- Múltiples precios por producto (público, mayoreo, veterinario)
+- Múltiples precios por producto (público, mayoreo, distribuidor)
 - Costos: último costo, costo promedio, costo de reposición
 - **Inventario por ubicación:** tienda y bodega son ubicaciones separadas
 - Transferencias entre ubicaciones (con folio y autorización)
@@ -322,7 +322,7 @@ lib/modules/<modulo>/
 **Secciones:**
 - **Empresa:** RFC, razón social, dirección, logo, certificado de sello digital (CSD)
 - **Sucursales/ubicaciones:** tienda, bodega, futuras sucursales
-- **Listas de precios:** público, mayoreo, veterinario
+- **Listas de precios:** público, mayoreo, distribuidor
 - **Formas de pago:** efectivo, tarjeta, transferencia, crédito
 - **Impresoras:** ticket térmico, factura tamaño carta
 - **Series y folios:** A001, B001, P001
@@ -451,7 +451,7 @@ model Cliente {
   codigoPostal    String?
   email           String?
   telefono        String?
-  tipoCliente     TipoCliente // PUBLICO, MAYOREO, VETERINARIO, GRANJA
+  tipoCliente     TipoCliente // PUBLICO, MAYOREO, DISTRIBUIDOR
   listaPrecioId   String?
   lineaCredito    Decimal  @default(0)
   diasCredito     Int      @default(0)
@@ -568,7 +568,7 @@ services:
     volumes:
       - pos_data:/data:ro
     environment:
-      S3_BUCKET: pos-veterinaria-backups
+      S3_BUCKET: ligerito-backups
 
 volumes:
   pos_data:

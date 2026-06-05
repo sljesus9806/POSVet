@@ -126,7 +126,7 @@ async function main() {
     create: {
       id: "empresa-default",
       rfc: "XAXX010101000",
-      razonSocial: "POSVet Veterinaria Demo SA de CV",
+      razonSocial: "Mi Negocio Demo SA de CV",
       regimenFiscal: "601",
       codigoPostal: "00000",
       direccion: "Configurar en /configuracion",
@@ -236,12 +236,12 @@ async function main() {
 
   console.log("→ Categorías base");
   const categorias = [
-    { nombre: "Antibióticos", descripcion: "Medicamentos antibióticos veterinarios" },
-    { nombre: "Antiparasitarios", descripcion: "Desparasitantes internos y externos" },
-    { nombre: "Alimento canino", descripcion: "Alimentos para perros" },
-    { nombre: "Alimento felino", descripcion: "Alimentos para gatos" },
-    { nombre: "Accesorios", descripcion: "Collares, juguetes, transportadoras" },
-    { nombre: "Servicios", descripcion: "Servicios veterinarios" },
+    { nombre: "Abarrotes", descripcion: "Despensa y productos de consumo básico" },
+    { nombre: "Bebidas", descripcion: "Aguas, refrescos y jugos" },
+    { nombre: "Farmacia", descripcion: "Medicamentos y cuidado personal" },
+    { nombre: "Limpieza", descripcion: "Artículos de limpieza y hogar" },
+    { nombre: "Papelería", descripcion: "Útiles escolares y de oficina" },
+    { nombre: "Servicios", descripcion: "Servicios prestados al cliente" },
   ];
   for (const c of categorias) {
     await prisma.categoria.upsert({
@@ -252,11 +252,9 @@ async function main() {
   }
 
   console.log("→ Productos demo");
-  const catAntibioticos = await prisma.categoria.findUnique({ where: { nombre: "Antibióticos" } });
-  const catAntipara = await prisma.categoria.findUnique({ where: { nombre: "Antiparasitarios" } });
-  const catCanino = await prisma.categoria.findUnique({ where: { nombre: "Alimento canino" } });
-  const catFelino = await prisma.categoria.findUnique({ where: { nombre: "Alimento felino" } });
-  const catAccesorios = await prisma.categoria.findUnique({ where: { nombre: "Accesorios" } });
+  const catFarmacia = await prisma.categoria.findUnique({ where: { nombre: "Farmacia" } });
+  const catAbarrotes = await prisma.categoria.findUnique({ where: { nombre: "Abarrotes" } });
+  const catLimpieza = await prisma.categoria.findUnique({ where: { nombre: "Limpieza" } });
 
   type SeedProducto = {
     sku: string;
@@ -269,7 +267,7 @@ async function main() {
     laboratorio?: string;
     requiereReceta?: boolean;
     costo: number;
-    precios: Array<{ tipo: "PUBLICO" | "MAYOREO" | "VETERINARIO"; precio: number }>;
+    precios: Array<{ tipo: "PUBLICO" | "MAYOREO" | "DISTRIBUIDOR"; precio: number }>;
     lote?: { lote: string; caducidad: Date; cantidad: number };
     stockTienda: number;
     stockBodega: number;
@@ -284,14 +282,13 @@ async function main() {
       nombre: "Amoxicilina 500mg (caja 10 tabletas)",
       tipo: "MEDICAMENTO",
       unidadMedida: "CAJA",
-      categoriaId: catAntibioticos?.id,
-      especie: "Canino",
-      laboratorio: "Bayer",
+      categoriaId: catFarmacia?.id,
+      laboratorio: "Genéricos",
       requiereReceta: true,
       costo: 85,
       precios: [
         { tipo: "PUBLICO", precio: 150 },
-        { tipo: "VETERINARIO", precio: 120 },
+        { tipo: "DISTRIBUIDOR", precio: 120 },
       ],
       lote: { lote: "L2026-001", caducidad: en12meses, cantidad: 50 },
       stockTienda: 30,
@@ -299,29 +296,28 @@ async function main() {
     },
     {
       sku: "MED-IVER-10",
-      nombre: "Ivermectina 1% inyectable 10ml",
+      nombre: "Ivermectina 6mg (caja 4 tabletas)",
       tipo: "MEDICAMENTO",
-      unidadMedida: "FRASCO",
-      categoriaId: catAntipara?.id,
-      laboratorio: "Zoetis",
+      unidadMedida: "CAJA",
+      categoriaId: catFarmacia?.id,
+      laboratorio: "Genéricos",
       requiereReceta: true,
       costo: 110,
       precios: [
         { tipo: "PUBLICO", precio: 190 },
-        { tipo: "VETERINARIO", precio: 155 },
+        { tipo: "DISTRIBUIDOR", precio: 155 },
       ],
       lote: { lote: "L2026-002", caducidad: en12meses, cantidad: 40 },
       stockTienda: 15,
       stockBodega: 25,
     },
     {
-      sku: "ALI-CAN-15K",
-      nombre: "Alimento canino adulto 15kg",
+      sku: "ABA-ATUN-24",
+      nombre: "Atún en agua (caja 24 latas)",
       tipo: "ALIMENTO",
-      unidadMedida: "BULTO",
-      categoriaId: catCanino?.id,
-      marca: "Royal Canin",
-      especie: "Canino",
+      unidadMedida: "CAJA",
+      categoriaId: catAbarrotes?.id,
+      marca: "Dolores",
       costo: 620,
       precios: [
         { tipo: "PUBLICO", precio: 890 },
@@ -332,13 +328,12 @@ async function main() {
       stockBodega: 12,
     },
     {
-      sku: "ALI-FEL-7K",
-      nombre: "Alimento felino adulto 7kg",
+      sku: "ABA-CAFE-1K",
+      nombre: "Café molido 1kg",
       tipo: "ALIMENTO",
-      unidadMedida: "BULTO",
-      categoriaId: catFelino?.id,
-      marca: "Whiskas",
-      especie: "Felino",
+      unidadMedida: "BOLSA",
+      categoriaId: catAbarrotes?.id,
+      marca: "Garat",
       costo: 380,
       precios: [
         { tipo: "PUBLICO", precio: 540 },
@@ -349,11 +344,12 @@ async function main() {
       stockBodega: 9,
     },
     {
-      sku: "ACC-COL-M",
-      nombre: "Collar ajustable mediano",
+      sku: "LIM-JAB-3",
+      nombre: "Jabón de tocador (paquete 3 piezas)",
       tipo: "ACCESORIO",
-      unidadMedida: "PZA",
-      categoriaId: catAccesorios?.id,
+      unidadMedida: "PAQUETE",
+      categoriaId: catLimpieza?.id,
+      marca: "Zest",
       costo: 45,
       precios: [
         { tipo: "PUBLICO", precio: 95 },

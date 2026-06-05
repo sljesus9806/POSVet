@@ -28,7 +28,7 @@ bash deploy/build-image.sh           # o: docker build -t posvet:latest .
 cd deploy && docker compose up -d && cd ..
 
 # 3. Dar de alta un cliente
-node deploy/provisionar.mjs serengueti --nombre "Veterinaria Serengueti"
+node deploy/provisionar.mjs serengueti --nombre "Tienda Serengueti"
 
 # 4. Abrir en Chrome
 #    http://serengueti.localhost      (los *.localhost resuelven a 127.0.0.1 solos)

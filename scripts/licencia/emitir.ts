@@ -1,6 +1,6 @@
 // Emite y firma una licencia. Corre en TU lado (usa la llave privada).
 //
-//   npm run lic:emitir -- --cliente "Veterinaria López" --modo offline --meses 12
+//   npm run lic:emitir -- --cliente "Tienda López" --modo offline --meses 12
 //
 // Opciones:
 //   --cliente <texto>   (requerido) negocio licenciado, visible en la UI

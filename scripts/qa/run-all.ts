@@ -29,7 +29,7 @@ const MODULOS: Array<{ archivo: string; titulo: string }> = [
 
 async function main(): Promise<void> {
   console.log("══════════════════════════════════════════════");
-  console.log("  POSVet — Suite de QA (capa A: integración)");
+  console.log("  Ligerito — Suite de QA (capa A: integración)");
   console.log("══════════════════════════════════════════════");
 
   for (const m of MODULOS) {
@@ -76,7 +76,7 @@ function escribirReporte(
 ): void {
   const fecha = new Date().toISOString().slice(0, 10);
   const out: string[] = [];
-  out.push(`# Resultados de pruebas funcionales — POSVet`);
+  out.push(`# Resultados de pruebas funcionales — Ligerito`);
   out.push("");
   out.push(`> Ejecutado: ${new Date().toISOString()}`);
   out.push(`> Capa A (integración, servicios vía index.ts). Guion: docs/plan-pruebas-funcionales.md`);

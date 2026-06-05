@@ -100,7 +100,7 @@ function dibujarPiePagina(doc: jsPDF) {
     doc.text(`Página ${i} de ${totalPages}`, pageW - 14, pageH - 8, {
       align: "right",
     });
-    doc.text("POSVet", 14, pageH - 8);
+    doc.text("Ligerito", 14, pageH - 8);
   }
   doc.setTextColor(0);
 }

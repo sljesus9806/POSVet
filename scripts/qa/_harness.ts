@@ -154,9 +154,9 @@ export const SEED = {
   skus: {
     amox: "MED-AMOX-500",
     iver: "MED-IVER-10",
-    canino: "ALI-CAN-15K",
-    felino: "ALI-FEL-7K",
-    collar: "ACC-COL-M",
+    canino: "ABA-ATUN-24",
+    felino: "ABA-CAFE-1K",
+    collar: "LIM-JAB-3",
   },
 } as const;
 

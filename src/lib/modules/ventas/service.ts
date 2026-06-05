@@ -340,7 +340,7 @@ export const ventasService = {
   async buscarProductosVendibles(opts: { ubicacionId: string; q?: string; limit?: number }): Promise<ProductoVendible[]> {
     const filas = await ventasRepository.productosVendibles(opts);
     return filas.map((p) => {
-      const precios: ProductoVendible["precios"] = { PUBLICO: null, MAYOREO: null, VETERINARIO: null };
+      const precios: ProductoVendible["precios"] = { PUBLICO: null, MAYOREO: null, DISTRIBUIDOR: null };
       for (const pr of p.precios) precios[pr.tipo] = toNumber(pr.precio);
       return {
         productoId: p.id,

@@ -3,7 +3,7 @@
 //   npm run lic:activar -- --url http://localhost:3000 --clave <claveActivacion>
 //
 // Contacta /api/v1/activar, instala el token devuelto y guarda url+clave para
-// que POSVet renueve solo de ahí en adelante. La clave se obtiene de la ficha
+// que Ligerito renueve solo de ahí en adelante. La clave se obtiene de la ficha
 // del cliente en el dashboard de la plataforma.
 
 import { hostname } from "node:os";

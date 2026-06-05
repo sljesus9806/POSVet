@@ -1,9 +1,10 @@
 @AGENTS.md
 
-# POSVet — instrucciones para Claude
+# Ligerito — instrucciones para Claude
 
-POS Veterinario modular en Next.js. Spec técnica en
-[`docs/POS-Veterinaria-Especificacion.md`](./docs/POS-Veterinaria-Especificacion.md) — léela
+POS general modular en Next.js (multi-giro: abarrotes, farmacia, veterinaria,
+papelería…). Spec técnica en
+[`docs/Especificacion-Tecnica.md`](./docs/Especificacion-Tecnica.md) — léela
 antes de tocar un módulo nuevo.
 
 ## Workflow obligatorio
