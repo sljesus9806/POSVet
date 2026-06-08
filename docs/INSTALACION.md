@@ -1,14 +1,19 @@
 # Instalación de POSVet
 
-POSVet se instala de **dos formas**, según el cliente:
+POSVet se instala de **tres formas**, según el cliente:
 
-| | 🖥️ Escritorio | ☁️ Nube |
-|---|---|---|
-| **Para quién** | Cliente de **una sola PC/ubicación** | Cliente con **varias ubicaciones** o que entra desde cualquier lado |
-| **Dónde viven los datos** | En la PC del cliente (Postgres embebido) | En tu servidor/PC |
-| **Cómo entra** | App instalada (ventana propia) | Navegador (Chrome) |
-| **Internet** | No necesita | Sí (para acceso remoto del cliente) |
-| **Docker** | No | Sí |
+| | 🖥️ Escritorio (.exe) | 🌐 Una PC por navegador | ☁️ Nube |
+|---|---|---|---|
+| **Para quién** | Una PC, ventana propia | **Una PC, entra por Chrome** | Varias ubicaciones / acceso remoto |
+| **Dónde viven los datos** | En la PC (Postgres embebido) | En la PC (PostgreSQL local) | En tu servidor/PC |
+| **Cómo entra** | App instalada (ventana propia) | Navegador a `localhost:3000` | Navegador (subdominio) |
+| **Internet** | No necesita | No necesita | Sí |
+| **Docker** | No | No | Sí |
+
+> 🌐 **Una PC por navegador** es la forma más sencilla cuando es **una sola
+> computadora** y la persona prefiere entrar por Chrome (favorito a `localhost`).
+> La PC es el servidor; arranca solo al prender. Guía y scripts:
+> [`deploy/windows/README.md`](../deploy/windows/README.md).
 
 ---
 

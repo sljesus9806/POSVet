@@ -1,0 +1,9 @@
+# Token de licencia del cliente (secreto, no versionar)
+licencia.token
+
+# Logs del servidor
+logs/
+*.log
+
+# Password del superusuario de Postgres si se llegara a guardar
+.pg-super.txt
