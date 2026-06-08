@@ -64,38 +64,40 @@ model Ubicacion {
 // =====================================================
 
 model Usuario {
-  id               String                 @id @default(cuid())
-  empresaId        String
-  email            String                 @unique
-  nombre           String
-  passwordHash     String
-  activo           Boolean                @default(true)
-  twoFactorEnabled Boolean                @default(false)
-  twoFactorSecret  String?
-  ultimoLoginAt    DateTime?
-  intentosFallidos Int                    @default(0)
-  bloqueadoHasta   DateTime?
-  empresa          Empresa                @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  roles            UsuarioRol[]
-  intentosLogin    IntentoLogin[]
-  auditLogs        AuditLog[]
-  movimientos      InventarioMovimiento[]
-  transferencias   Transferencia[]
-  cajasAbiertas    Caja[]                 @relation("CajaAbiertaPor")
-  cajasCerradas    Caja[]                 @relation("CajaCerradaPor")
-  ventas           Venta[]                @relation("VentaUsuario")
-  ventasCanceladas Venta[]                @relation("VentaCanceladaPor")
-  ordenesCompra    OrdenCompra[]          @relation("OcCreadaPor")
-  ordenesCanceladas OrdenCompra[]         @relation("OcCanceladaPor")
-  recepciones      RecepcionMercancia[]
-  facturasProveedorCapturadas FacturaProveedor[] @relation("FacturaProvCapturada")
-  facturasProveedorCanceladas FacturaProveedor[] @relation("FacturaProvCancelada")
-  pagosProveedorRegistrados ProveedorPago[]    @relation("PagoProvRegistrado")
-  pagosProveedorCancelados ProveedorPago[]    @relation("PagoProvCancelado")
-  abonosRegistrados   ClienteAbono[]      @relation("AbonoRegistrado")
-  abonosCancelados    ClienteAbono[]      @relation("AbonoCancelado")
-  createdAt        DateTime               @default(now())
-  updatedAt        DateTime               @updatedAt
+  id                          String                 @id @default(cuid())
+  empresaId                   String
+  email                       String                 @unique
+  nombre                      String
+  passwordHash                String
+  activo                      Boolean                @default(true)
+  twoFactorEnabled            Boolean                @default(false)
+  twoFactorSecret             String?
+  ultimoLoginAt               DateTime?
+  intentosFallidos            Int                    @default(0)
+  bloqueadoHasta              DateTime?
+  empresa                     Empresa                @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  roles                       UsuarioRol[]
+  intentosLogin               IntentoLogin[]
+  auditLogs                   AuditLog[]
+  movimientos                 InventarioMovimiento[]
+  transferencias              Transferencia[]
+  cajasAbiertas               Caja[]                 @relation("CajaAbiertaPor")
+  cajasCerradas               Caja[]                 @relation("CajaCerradaPor")
+  ventas                      Venta[]                @relation("VentaUsuario")
+  ventasCanceladas            Venta[]                @relation("VentaCanceladaPor")
+  ordenesCompra               OrdenCompra[]          @relation("OcCreadaPor")
+  ordenesCanceladas           OrdenCompra[]          @relation("OcCanceladaPor")
+  recepciones                 RecepcionMercancia[]
+  facturasProveedorCapturadas FacturaProveedor[]     @relation("FacturaProvCapturada")
+  facturasProveedorCanceladas FacturaProveedor[]     @relation("FacturaProvCancelada")
+  pagosProveedorRegistrados   ProveedorPago[]        @relation("PagoProvRegistrado")
+  pagosProveedorCancelados    ProveedorPago[]        @relation("PagoProvCancelado")
+  abonosRegistrados           ClienteAbono[]         @relation("AbonoRegistrado")
+  abonosCancelados            ClienteAbono[]         @relation("AbonoCancelado")
+  facturasEmitidas            Factura[]              @relation("FacturaCfdiEmitida")
+  facturasCfdiCanceladas      Factura[]              @relation("FacturaCfdiCancelada")
+  createdAt                   DateTime               @default(now())
+  updatedAt                   DateTime               @updatedAt
 
   @@index([empresaId])
 }
@@ -256,18 +258,18 @@ model ProductoPrecio {
 }
 
 model ProductoLote {
-  id            String                 @id @default(cuid())
-  productoId    String
-  lote          String
-  caducidad     DateTime
-  cantidad      Decimal                @default(0) @db.Decimal(14, 3)
-  costoUnitario Decimal                @db.Decimal(12, 2)
-  producto         Producto               @relation(fields: [productoId], references: [id], onDelete: Cascade)
-  movimientos      InventarioMovimiento[]
-  ventaLineas      VentaLinea[]
-  recepcionLineas  RecepcionLinea[]
-  createdAt        DateTime               @default(now())
-  updatedAt        DateTime               @updatedAt
+  id              String                 @id @default(cuid())
+  productoId      String
+  lote            String
+  caducidad       DateTime
+  cantidad        Decimal                @default(0) @db.Decimal(14, 3)
+  costoUnitario   Decimal                @db.Decimal(12, 2)
+  producto        Producto               @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  movimientos     InventarioMovimiento[]
+  ventaLineas     VentaLinea[]
+  recepcionLineas RecepcionLinea[]
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
 
   @@unique([productoId, lote])
   @@index([caducidad])
@@ -385,8 +387,8 @@ enum TipoCliente {
 }
 
 model Cliente {
-  id            String      @id @default(cuid())
-  codigo        String      @unique // CLI-00001
+  id            String         @id @default(cuid())
+  codigo        String         @unique // CLI-00001
   nombre        String
   rfc           String?
   regimenFiscal String?
@@ -395,18 +397,18 @@ model Cliente {
   email         String?
   telefono      String?
   notas         String?
-  tipoCliente   TipoCliente @default(PUBLICO)
+  tipoCliente   TipoCliente    @default(PUBLICO)
   // Override opcional del tipo de precio. Si null, se deriva de tipoCliente.
   tipoPrecio    TipoPrecio?
   // Campos reservados para Fase 2 (crédito y cobranza). Default 0, sin uso aún.
-  lineaCredito  Decimal     @default(0) @db.Decimal(12, 2)
-  diasCredito   Int         @default(0)
-  saldoActual   Decimal     @default(0) @db.Decimal(12, 2)
-  activo        Boolean     @default(true)
+  lineaCredito  Decimal        @default(0) @db.Decimal(12, 2)
+  diasCredito   Int            @default(0)
+  saldoActual   Decimal        @default(0) @db.Decimal(12, 2)
+  activo        Boolean        @default(true)
   ventas        Venta[]
   abonos        ClienteAbono[]
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 
   @@index([nombre])
   @@index([rfc])
@@ -488,27 +490,27 @@ enum FormaPago {
 }
 
 model Caja {
-  id                     String       @id @default(cuid())
-  folio                  String       @unique // C-YYYY-NNNNN
-  ubicacionId            String
-  abiertaPorId           String
-  cerradaPorId           String?
-  estado                 EstadoCaja   @default(ABIERTA)
-  fondoInicial           Decimal      @default(0) @db.Decimal(12, 2)
-  montoEsperadoEfectivo  Decimal?     @db.Decimal(12, 2) // calculado al cierre
-  montoContadoEfectivo   Decimal?     @db.Decimal(12, 2) // capturado por el cajero
-  diferenciaEfectivo     Decimal?     @db.Decimal(12, 2)
-  totalVendido           Decimal      @default(0) @db.Decimal(12, 2)
-  observacionesApertura  String?
-  observacionesCierre    String?
-  abiertaEn              DateTime     @default(now())
-  cerradaEn              DateTime?
-  ubicacion              Ubicacion    @relation(fields: [ubicacionId], references: [id])
-  abiertaPor             Usuario      @relation("CajaAbiertaPor", fields: [abiertaPorId], references: [id])
-  cerradaPor             Usuario?     @relation("CajaCerradaPor", fields: [cerradaPorId], references: [id])
-  ventas                 Venta[]
-  createdAt              DateTime     @default(now())
-  updatedAt              DateTime     @updatedAt
+  id                    String     @id @default(cuid())
+  folio                 String     @unique // C-YYYY-NNNNN
+  ubicacionId           String
+  abiertaPorId          String
+  cerradaPorId          String?
+  estado                EstadoCaja @default(ABIERTA)
+  fondoInicial          Decimal    @default(0) @db.Decimal(12, 2)
+  montoEsperadoEfectivo Decimal?   @db.Decimal(12, 2) // calculado al cierre
+  montoContadoEfectivo  Decimal?   @db.Decimal(12, 2) // capturado por el cajero
+  diferenciaEfectivo    Decimal?   @db.Decimal(12, 2)
+  totalVendido          Decimal    @default(0) @db.Decimal(12, 2)
+  observacionesApertura String?
+  observacionesCierre   String?
+  abiertaEn             DateTime   @default(now())
+  cerradaEn             DateTime?
+  ubicacion             Ubicacion  @relation(fields: [ubicacionId], references: [id])
+  abiertaPor            Usuario    @relation("CajaAbiertaPor", fields: [abiertaPorId], references: [id])
+  cerradaPor            Usuario?   @relation("CajaCerradaPor", fields: [cerradaPorId], references: [id])
+  ventas                Venta[]
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
 
   @@index([ubicacionId, estado])
   @@index([abiertaPorId, estado])
@@ -516,40 +518,41 @@ model Caja {
 }
 
 model Venta {
-  id                  String       @id @default(cuid())
-  folio               String       @unique // V-YYYY-NNNNNN
-  cajaId              String
-  ubicacionId         String
-  usuarioId           String
-  clienteId           String?
-  estado              EstadoVenta  @default(COMPLETADA)
-  tipoPrecio          TipoPrecio   @default(PUBLICO)
-  subtotal            Decimal      @default(0) @db.Decimal(12, 2) // suma de líneas sin IVA, después de descuento
-  descuentoLineas     Decimal      @default(0) @db.Decimal(12, 2) // suma de descuentos por línea
-  descuentoGlobal     Decimal      @default(0) @db.Decimal(12, 2)
-  iva                 Decimal      @default(0) @db.Decimal(12, 2)
-  total               Decimal      @default(0) @db.Decimal(12, 2)
-  totalPagado         Decimal      @default(0) @db.Decimal(12, 2)
-  cambio              Decimal      @default(0) @db.Decimal(12, 2)
+  id                String                 @id @default(cuid())
+  folio             String                 @unique // V-YYYY-NNNNNN
+  cajaId            String
+  ubicacionId       String
+  usuarioId         String
+  clienteId         String?
+  estado            EstadoVenta            @default(COMPLETADA)
+  tipoPrecio        TipoPrecio             @default(PUBLICO)
+  subtotal          Decimal                @default(0) @db.Decimal(12, 2) // suma de líneas sin IVA, después de descuento
+  descuentoLineas   Decimal                @default(0) @db.Decimal(12, 2) // suma de descuentos por línea
+  descuentoGlobal   Decimal                @default(0) @db.Decimal(12, 2)
+  iva               Decimal                @default(0) @db.Decimal(12, 2)
+  total             Decimal                @default(0) @db.Decimal(12, 2)
+  totalPagado       Decimal                @default(0) @db.Decimal(12, 2)
+  cambio            Decimal                @default(0) @db.Decimal(12, 2)
   // Crédito otorgado en esta venta (suma de pagos con forma=CREDITO). saldoCredito
   // decrece con abonos. Cuando saldoCredito > 0, la venta aporta al saldoActual del cliente.
-  montoCredito        Decimal      @default(0) @db.Decimal(12, 2)
-  saldoCredito        Decimal      @default(0) @db.Decimal(12, 2)
-  observaciones       String?
-  motivoCancelacion   String?
-  canceladaPorId      String?
-  canceladaEn         DateTime?
-  fechaVenta          DateTime     @default(now())
-  caja                Caja         @relation(fields: [cajaId], references: [id])
-  ubicacion           Ubicacion    @relation(fields: [ubicacionId], references: [id])
-  usuario             Usuario      @relation("VentaUsuario", fields: [usuarioId], references: [id])
-  canceladaPor        Usuario?     @relation("VentaCanceladaPor", fields: [canceladaPorId], references: [id])
-  cliente             Cliente?     @relation(fields: [clienteId], references: [id])
-  lineas              VentaLinea[]
-  pagos               VentaPago[]
-  abonosAplicados     AbonoVentaAplicacion[]
-  createdAt           DateTime     @default(now())
-  updatedAt           DateTime     @updatedAt
+  montoCredito      Decimal                @default(0) @db.Decimal(12, 2)
+  saldoCredito      Decimal                @default(0) @db.Decimal(12, 2)
+  observaciones     String?
+  motivoCancelacion String?
+  canceladaPorId    String?
+  canceladaEn       DateTime?
+  fechaVenta        DateTime               @default(now())
+  caja              Caja                   @relation(fields: [cajaId], references: [id])
+  ubicacion         Ubicacion              @relation(fields: [ubicacionId], references: [id])
+  usuario           Usuario                @relation("VentaUsuario", fields: [usuarioId], references: [id])
+  canceladaPor      Usuario?               @relation("VentaCanceladaPor", fields: [canceladaPorId], references: [id])
+  cliente           Cliente?               @relation(fields: [clienteId], references: [id])
+  lineas            VentaLinea[]
+  pagos             VentaPago[]
+  abonosAplicados   AbonoVentaAplicacion[]
+  facturas          Factura[]
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
 
   @@index([cajaId])
   @@index([ubicacionId, fechaVenta])
@@ -560,24 +563,24 @@ model Venta {
 }
 
 model VentaLinea {
-  id              String        @id @default(cuid())
-  ventaId         String
-  productoId      String
-  loteId          String?
+  id             String        @id @default(cuid())
+  ventaId        String
+  productoId     String
+  loteId         String?
   // Snapshot del producto al momento de la venta (no se altera si cambia el catálogo)
-  productoSku     String
-  productoNombre  String
-  unidadMedida    String
-  cantidad        Decimal       @db.Decimal(14, 3)
-  precioUnitario  Decimal       @db.Decimal(12, 2)
-  descuento       Decimal       @default(0) @db.Decimal(12, 2) // importe absoluto de descuento de la línea
-  subtotal        Decimal       @db.Decimal(12, 2) // (precio*cant) - descuento, sin IVA
-  ivaTasa         Decimal       @default(0) @db.Decimal(5, 4)
-  ivaImporte      Decimal       @default(0) @db.Decimal(12, 2)
-  total           Decimal       @db.Decimal(12, 2)
-  venta           Venta         @relation(fields: [ventaId], references: [id], onDelete: Cascade)
-  producto        Producto      @relation(fields: [productoId], references: [id])
-  lote            ProductoLote? @relation(fields: [loteId], references: [id], onDelete: SetNull)
+  productoSku    String
+  productoNombre String
+  unidadMedida   String
+  cantidad       Decimal       @db.Decimal(14, 3)
+  precioUnitario Decimal       @db.Decimal(12, 2)
+  descuento      Decimal       @default(0) @db.Decimal(12, 2) // importe absoluto de descuento de la línea
+  subtotal       Decimal       @db.Decimal(12, 2) // (precio*cant) - descuento, sin IVA
+  ivaTasa        Decimal       @default(0) @db.Decimal(5, 4)
+  ivaImporte     Decimal       @default(0) @db.Decimal(12, 2)
+  total          Decimal       @db.Decimal(12, 2)
+  venta          Venta         @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  producto       Producto      @relation(fields: [productoId], references: [id])
+  lote           ProductoLote? @relation(fields: [loteId], references: [id], onDelete: SetNull)
 
   @@index([ventaId])
   @@index([productoId])
@@ -629,7 +632,7 @@ model OrdenCompra {
   usuario            Usuario              @relation("OcCreadaPor", fields: [usuarioId], references: [id])
   canceladaPor       Usuario?             @relation("OcCanceladaPor", fields: [canceladaPorId], references: [id])
   lineas             OcLinea[]
-  recepciones       RecepcionMercancia[]
+  recepciones        RecepcionMercancia[]
   facturas           FacturaProveedor[]
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
@@ -669,8 +672,8 @@ model RecepcionMercancia {
   folio          String           @unique // REC-YYYY-NNNNN
   ordenCompraId  String
   ubicacionId    String // dónde entró la mercancía (debe coincidir con destino de la OC)
-  usuarioId     String
-  observaciones String?
+  usuarioId      String
+  observaciones  String?
   fechaRecepcion DateTime         @default(now())
   ordenCompra    OrdenCompra      @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
   ubicacion      Ubicacion        @relation(fields: [ubicacionId], references: [id])
@@ -707,10 +710,10 @@ model RecepcionLinea {
 // =====================================================
 
 enum EstadoFacturaProveedor {
-  PENDIENTE      // saldo > 0, sin pagos
+  PENDIENTE // saldo > 0, sin pagos
   PAGADA_PARCIAL // saldo > 0, con al menos un pago
-  PAGADA         // saldo == 0
-  CANCELADA      // anulada antes o después; no afecta saldo del proveedor
+  PAGADA // saldo == 0
+  CANCELADA // anulada antes o después; no afecta saldo del proveedor
 }
 
 enum FormaPagoProveedor {
@@ -730,27 +733,27 @@ model FacturaProveedor {
   id                String                  @id @default(cuid())
   folio             String                  @unique // FCP-YYYY-NNNNN, interno
   folioProveedor    String // folio que viene en la factura del proveedor (CFDI UUID o consecutivo)
-  proveedorId      String
-  ordenCompraId    String?
-  fechaEmision     DateTime
-  fechaVencimiento DateTime
-  subtotal         Decimal                 @default(0) @db.Decimal(12, 2)
-  iva              Decimal                 @default(0) @db.Decimal(12, 2)
-  total            Decimal                 @db.Decimal(12, 2)
-  saldo            Decimal                 @db.Decimal(12, 2) // total - sum(aplicaciones activas); 0 = pagada
-  estado           EstadoFacturaProveedor  @default(PENDIENTE)
-  observaciones    String?
+  proveedorId       String
+  ordenCompraId     String?
+  fechaEmision      DateTime
+  fechaVencimiento  DateTime
+  subtotal          Decimal                 @default(0) @db.Decimal(12, 2)
+  iva               Decimal                 @default(0) @db.Decimal(12, 2)
+  total             Decimal                 @db.Decimal(12, 2)
+  saldo             Decimal                 @db.Decimal(12, 2) // total - sum(aplicaciones activas); 0 = pagada
+  estado            EstadoFacturaProveedor  @default(PENDIENTE)
+  observaciones     String?
   motivoCancelacion String?
-  canceladaPorId   String?
-  canceladaEn      DateTime?
-  usuarioId        String // quien capturó la factura
-  proveedor        Proveedor               @relation(fields: [proveedorId], references: [id])
-  ordenCompra      OrdenCompra?            @relation(fields: [ordenCompraId], references: [id], onDelete: SetNull)
-  usuario          Usuario                 @relation("FacturaProvCapturada", fields: [usuarioId], references: [id])
-  canceladaPor     Usuario?                @relation("FacturaProvCancelada", fields: [canceladaPorId], references: [id])
-  aplicaciones     PagoFacturaAplicacion[]
-  createdAt        DateTime                @default(now())
-  updatedAt        DateTime                @updatedAt
+  canceladaPorId    String?
+  canceladaEn       DateTime?
+  usuarioId         String // quien capturó la factura
+  proveedor         Proveedor               @relation(fields: [proveedorId], references: [id])
+  ordenCompra       OrdenCompra?            @relation(fields: [ordenCompraId], references: [id], onDelete: SetNull)
+  usuario           Usuario                 @relation("FacturaProvCapturada", fields: [usuarioId], references: [id])
+  canceladaPor      Usuario?                @relation("FacturaProvCancelada", fields: [canceladaPorId], references: [id])
+  aplicaciones      PagoFacturaAplicacion[]
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
 
   // Un proveedor no debería repetir folio interno propio.
   @@unique([proveedorId, folioProveedor])
@@ -844,12 +847,12 @@ model ClienteAbono {
 // Distribución de un abono entre 1+ ventas a crédito del mismo cliente.
 // La suma de monto por abonoId debe igualar ClienteAbono.monto (validado en service).
 model AbonoVentaAplicacion {
-  id       String       @id @default(cuid())
-  abonoId  String
-  ventaId  String
-  monto    Decimal      @db.Decimal(12, 2)
-  abono    ClienteAbono @relation(fields: [abonoId], references: [id], onDelete: Cascade)
-  venta    Venta        @relation(fields: [ventaId], references: [id])
+  id      String       @id @default(cuid())
+  abonoId String
+  ventaId String
+  monto   Decimal      @db.Decimal(12, 2)
+  abono   ClienteAbono @relation(fields: [abonoId], references: [id], onDelete: Cascade)
+  venta   Venta        @relation(fields: [ventaId], references: [id])
 
   @@unique([abonoId, ventaId])
   @@index([ventaId])
@@ -879,4 +882,108 @@ model Licencia {
   revocada         Boolean   @default(false) // la plataforma respondió suspendida/vencida
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
+}
+
+// =====================================================
+// FACTURACIÓN (CFDI 4.0 vía PAC — Facturama)
+// =====================================================
+
+enum TipoCfdi {
+  INGRESO // I — factura normal de venta
+  EGRESO // E — nota de crédito (fase posterior)
+  PAGO // P — complemento de pago (fase posterior)
+}
+
+enum EstadoFactura {
+  TIMBRADA // CFDI vigente, sellado por el SAT
+  CANCELADA // CFDI cancelado ante el SAT
+}
+
+// Un CFDI emitido. El XML timbrado es el documento fiscal; el PDF se genera al
+// vuelo a partir de estos datos. Emisor y receptor se guardan como snapshot
+// para que la factura no cambie si luego se edita la empresa o el cliente.
+model Factura {
+  id     String        @id @default(cuid())
+  serie  String // "A"
+  folio  Int // correlativo por serie
+  tipo   TipoCfdi      @default(INGRESO)
+  estado EstadoFactura @default(TIMBRADA)
+
+  // Emisor (snapshot al timbrar)
+  emisorRfc       String
+  emisorNombre    String
+  emisorRegimen   String
+  lugarExpedicion String // CP de expedición
+
+  // Receptor (snapshot al timbrar)
+  receptorRfc     String
+  receptorNombre  String
+  receptorRegimen String
+  receptorUsoCfdi String
+  receptorCp      String
+
+  // Importes
+  moneda     String  @default("MXN")
+  subtotal   Decimal @db.Decimal(12, 2)
+  descuento  Decimal @default(0) @db.Decimal(12, 2)
+  iva        Decimal @default(0) @db.Decimal(12, 2)
+  total      Decimal @db.Decimal(12, 2)
+  formaPago  String // clave SAT: 01 efectivo, 03 transferencia, 04 tarjeta...
+  metodoPago String  @default("PUE") // PUE pago en una exhibición
+
+  // Datos del timbre (devueltos por el PAC)
+  uuid             String?   @unique // folio fiscal
+  fechaTimbrado    DateTime?
+  selloCfd         String?   @db.Text
+  selloSat         String?   @db.Text
+  noCertificadoSat String?
+  xml              String?   @db.Text // CFDI timbrado completo
+
+  // Integración PAC
+  pacProveedor String  @default("demo") // demo | facturama
+  pacFacturaId String? // id del CFDI dentro del PAC (para cancelar/descargar)
+  esDemo       Boolean @default(false) // timbre simulado (no fiscal)
+
+  // Cancelación
+  motivoCancelacion String? // clave SAT: 01, 02, 03, 04
+  folioSustitucion  String? // UUID que sustituye (motivo 01)
+  canceladaEn       DateTime?
+  canceladaPorId    String?
+
+  // Relaciones
+  ventaId      String?
+  usuarioId    String // quien emitió
+  venta        Venta?         @relation(fields: [ventaId], references: [id])
+  usuario      Usuario        @relation("FacturaCfdiEmitida", fields: [usuarioId], references: [id])
+  canceladaPor Usuario?       @relation("FacturaCfdiCancelada", fields: [canceladaPorId], references: [id])
+  lineas       FacturaLinea[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([serie, folio])
+  @@index([ventaId])
+  @@index([estado])
+  @@index([receptorRfc])
+  @@index([fechaTimbrado])
+  @@index([uuid])
+}
+
+model FacturaLinea {
+  id               String  @id @default(cuid())
+  facturaId        String
+  claveProdServ    String // clave SAT del producto/servicio (8 dígitos)
+  claveUnidad      String // clave SAT de unidad (H87 pieza, etc.)
+  noIdentificacion String? // SKU interno
+  descripcion      String
+  cantidad         Decimal @db.Decimal(14, 3)
+  valorUnitario    Decimal @db.Decimal(12, 2)
+  importe          Decimal @db.Decimal(12, 2) // cantidad * valorUnitario (sin IVA, sin descuento)
+  descuento        Decimal @default(0) @db.Decimal(12, 2)
+  objetoImp        String  @default("02") // 02 = sí objeto de impuesto
+  ivaTasa          Decimal @default(0) @db.Decimal(5, 4)
+  ivaImporte       Decimal @default(0) @db.Decimal(12, 2)
+  factura          Factura @relation(fields: [facturaId], references: [id], onDelete: Cascade)
+
+  @@index([facturaId])
 }

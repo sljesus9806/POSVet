@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Printer } from "lucide-react";
+import { Printer, FileText } from "lucide-react";
 import { ventasService } from "@/lib/modules/ventas";
+import { facturacionService } from "@/lib/modules/facturacion";
 import { requirePermission, hasPermission, requireUser } from "@/lib/auth-helpers";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,11 @@ export default async function VentaDetallePage({ params }: { params: Params }) {
   if (!v) notFound();
 
   const puedeCancelar = hasPermission(user, "ventas:autorizar");
+  const puedeFacturar = hasPermission(user, "facturacion:crear");
+  const factura =
+    v.estado === "COMPLETADA" && (puedeFacturar || hasPermission(user, "facturacion:leer"))
+      ? await facturacionService.facturaDeVenta(v.id)
+      : null;
 
   return (
     <div className="space-y-6">
@@ -53,6 +59,22 @@ export default async function VentaDetallePage({ params }: { params: Params }) {
               <Printer className="size-4" /> Imprimir ticket
             </a>
           </Button>
+          {factura ? (
+            <Button variant="outline" asChild>
+              <Link href={`/facturacion/${factura.id}`}>
+                <FileText className="size-4" /> Ver factura {factura.serieFolio}
+              </Link>
+            </Button>
+          ) : (
+            v.estado === "COMPLETADA" &&
+            puedeFacturar && (
+              <Button asChild>
+                <Link href={`/facturacion/nueva?venta=${v.id}`}>
+                  <FileText className="size-4" /> Facturar
+                </Link>
+              </Button>
+            )
+          )}
         </div>
       </div>
 

@@ -51,6 +51,7 @@ const ROLES: Array<{
       "reportes:leer",
       "facturacion:leer",
       "facturacion:crear",
+      "facturacion:autorizar",
       "proveedores:leer",
       "compras:leer",
       "compras:autorizar",

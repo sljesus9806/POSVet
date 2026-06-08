@@ -18,7 +18,7 @@ const NAV: Array<NavItem & { permiso?: string }> = [
   { href: "/proveedores", label: "Proveedores", iconName: "proveedores", permiso: "proveedores:leer" },
   { href: "/compras", label: "Compras", iconName: "compras", permiso: "compras:leer" },
   { href: "/cuentas-pagar", label: "Cuentas por pagar", iconName: "cxp", permiso: "cuentas-pagar:leer" },
-  { href: "/facturacion", label: "Facturación", iconName: "facturacion", disabled: true, permiso: "facturacion:leer" },
+  { href: "/facturacion", label: "Facturación", iconName: "facturacion", permiso: "facturacion:leer" },
   { href: "/reportes", label: "Reportes", iconName: "reportes", permiso: "reportes:leer" },
   { href: "/usuarios", label: "Usuarios", iconName: "usuarios", permiso: "usuarios:leer" },
   { href: "/auditoria", label: "Auditoría", iconName: "auditoria", permiso: "auditoria:leer" },
