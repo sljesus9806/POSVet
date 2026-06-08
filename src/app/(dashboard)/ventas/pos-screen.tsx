@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Plus, Search, Trash2, X, Banknote, CreditCard, Printer, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -305,8 +306,16 @@ export function POSScreen({
         return;
       }
       setMostrarCobro(false);
-      // Abre el ticket en pestaña nueva y limpia el carrito
-      window.open(`/ventas/historial/${res.ventaId}/ticket`, "_blank", "noopener");
+      // Descarga el recibo en PDF SIN cambiar de pestaña y avisa con un toast.
+      const a = document.createElement("a");
+      a.href = `/ventas/historial/${res.ventaId}/ticket/pdf`;
+      a.download = `Recibo_${res.folio}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      toast.success(`Venta ${res.folio} cobrada`, {
+        description: "El recibo se generó y se descargó en PDF.",
+      });
       limpiarCarrito();
       router.refresh();
     });
@@ -722,7 +731,7 @@ export function POSScreen({
                 disabled={pendingSave || pagado + 0.001 < calculos.total}
               >
                 <Printer className="size-4" />
-                {pendingSave ? "Guardando…" : "Cobrar e imprimir (F8)"}
+                {pendingSave ? "Guardando…" : "Cobrar (F8)"}
               </Button>
             </div>
           </div>
