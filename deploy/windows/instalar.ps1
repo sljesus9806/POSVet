@@ -149,26 +149,36 @@ SEED_ADMIN_NOMBRE="Administrador"
 # Para que prisma/tsx vean la BD en este mismo proceso:
 $env:DATABASE_URL = $DatabaseUrl
 
-# --- 5. Dependencias, build, migraciones, seed ---------------------------
+# --- 5. Dependencias, migraciones, seed, build ---------------------------
+# En Windows npm/npx son .cmd; resolvemos la ruta explícita para no depender
+# solo de PATHEXT (más robusto justo después de instalar Node con winget).
+$npmCmd = (Get-Command npm.cmd -ErrorAction SilentlyContinue).Source
+if (-not $npmCmd) { $npmCmd = "npm" }
+$npxCmd = (Get-Command npx.cmd -ErrorAction SilentlyContinue).Source
+if (-not $npxCmd) { $npxCmd = "npx" }
+
 Push-Location $RepoRoot
 try {
   Info "Instalando dependencias (npm ci)…"
-  Run "npm" @("ci")
+  Run $npmCmd @("ci")
 
   Info "Generando cliente de Prisma para Windows…"
-  Run "npx" @("prisma","generate")
+  Run $npxCmd @("prisma","generate")
 
-  Info "Construyendo la app (npm run build)… (tarda unos minutos)"
-  Run "npm" @("run","build")
-
+  # IMPORTANTE: migrar y sembrar ANTES de construir. Next prerenderiza algunas
+  # páginas en el build y si tocan la BD, las tablas deben existir ya. (Si no,
+  # el build truena con 'relation does not exist' en la PC del cliente.)
   Info "Aplicando migraciones…"
-  Run "npx" @("prisma","migrate","deploy")
+  Run $npxCmd @("prisma","migrate","deploy")
 
   Info "Sembrando datos iniciales…"
-  Run "npx" @("prisma","db","seed")
+  Run $npxCmd @("prisma","db","seed")
+
+  Info "Construyendo la app (npm run build)… (tarda unos minutos)"
+  Run $npmCmd @("run","build")
 }
 finally { Pop-Location }
-Ok "App construida y base lista"
+Ok "Base lista y app construida"
 
 # --- 6. Licencia offline -------------------------------------------------
 if (-not $TokenLicencia) {
@@ -178,15 +188,20 @@ if (-not $TokenLicencia) {
 if ($TokenLicencia -and (Test-Path $TokenLicencia)) {
   Info "Instalando licencia offline…"
   Push-Location $RepoRoot
-  try { Run "npm" @("run","lic:instalar","--","--archivo","$TokenLicencia") }
+  try { Run $npmCmd @("run","lic:instalar","--","--archivo","$TokenLicencia") }
   finally { Pop-Location }
   Ok "Licencia instalada"
 } else {
-  Warn "SIN licencia: la app quedará BLOQUEADA (pantalla /licencia) hasta instalar una."
-  Warn "En TU PC de desarrollo (la que tiene la llave privada):"
-  Warn "    npm run lic:emitir -- --cliente `"Nombre del negocio`" --modo offline --meses 120"
-  Warn "Copia el token a:  $((Join-Path $ScriptDir 'licencia.token'))"
-  Warn "y vuelve a correr este instalador (o:  npm run lic:instalar -- --archivo <token>)."
+  Write-Host ""
+  Warn "==================== SIN LICENCIA ===================="
+  Warn "La app quedará BLOQUEADA (pantalla /licencia) hasta instalar una."
+  Warn "Pasos (en TU PC de desarrollo, la que tiene la llave privada):"
+  Warn "  1) npm run lic:emitir -- --cliente `"Nombre del negocio`" --modo offline --meses 120"
+  Warn "  2) Guarda el token impreso en:  $((Join-Path $ScriptDir 'licencia.token'))"
+  Warn "  3) Vuelve a correr este instalador  (o, ya aquí:"
+  Warn "       npm run lic:instalar -- --archivo deploy\windows\licencia.token )"
+  Warn "======================================================"
+  Write-Host ""
 }
 
 # --- 7. Arranque automático + accesos directos ---------------------------
