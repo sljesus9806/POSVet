@@ -213,6 +213,14 @@ export function POSScreen({
     });
   }
 
+  // Selección desde el dropdown de autocompletar: agrega y deja listo el
+  // buscador para el siguiente producto (cierra la lista al limpiar la query).
+  function seleccionarProducto(p: ProductoVendible) {
+    agregarProducto(p);
+    setProductosQuery("");
+    setTimeout(() => refBusquedaProducto.current?.focus(), 0);
+  }
+
   function actualizarLinea(uid: string, patch: Partial<LineaCarrito>) {
     setLineas((prev) => prev.map((l) => (l.uid === uid ? { ...l, ...patch } : l)));
   }
@@ -381,11 +389,51 @@ export function POSScreen({
             <Input
               ref={refBusquedaProducto}
               autoFocus
-              placeholder="Buscar producto (F2) — SKU, nombre, código de barras"
+              placeholder="Buscar producto (F2) — nombre, código de barras o SKU"
               value={productosQuery}
               onChange={(e) => setProductosQuery(e.target.value)}
               className="pl-9"
             />
+
+            {/* Resultados en vivo (autocompletar) bajo el buscador */}
+            {productosQuery.trim() && (
+              <div className="absolute left-0 right-0 top-full mt-1 z-20 bg-card border rounded-md shadow-lg max-h-[360px] overflow-y-auto divide-y">
+                {productos.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-muted-foreground">
+                    {buscandoProductos ? "buscando…" : "Sin resultados."}
+                  </div>
+                ) : (
+                  productos.map((p) => {
+                    const precio = precioDeProducto(p, tipoPrecio);
+                    const sinStock = p.stockUbicacion <= 0;
+                    return (
+                      <button
+                        key={p.productoId}
+                        type="button"
+                        onClick={() => seleccionarProducto(p)}
+                        disabled={sinStock || precio <= 0}
+                        className="w-full text-left p-3 flex items-center gap-3 hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium truncate">{p.nombre}</div>
+                          <div className="text-xs text-muted-foreground font-mono truncate">
+                            {p.sku}
+                            {p.codigoBarras ? ` · ${p.codigoBarras}` : ""}
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="font-semibold tabular-nums">{fmt(precio)}</div>
+                          <div className="text-xs text-muted-foreground tabular-nums">
+                            Stock: {p.stockUbicacion} {p.unidadMedida}
+                          </div>
+                        </div>
+                        <Plus className="size-4 text-muted-foreground" />
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            )}
           </div>
           <div className="text-xs text-muted-foreground flex items-center gap-1">
             <span>Lista de precios aplicada:</span>
@@ -394,36 +442,23 @@ export function POSScreen({
           </div>
         </div>
 
-        <div className="bg-card rounded-lg border max-h-[600px] overflow-y-auto divide-y">
-          {productos.length === 0 ? (
-            <div className="p-6 text-center text-sm text-muted-foreground">Sin resultados.</div>
-          ) : (
-            productos.map((p) => {
-              const precio = precioDeProducto(p, tipoPrecio);
-              const sinStock = p.stockUbicacion <= 0;
-              return (
-                <button
-                  key={p.productoId}
-                  type="button"
-                  onClick={() => agregarProducto(p)}
-                  disabled={sinStock || precio <= 0}
-                  className="w-full text-left p-3 flex items-center gap-3 hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate">{p.nombre}</div>
-                    <div className="text-xs text-muted-foreground font-mono">{p.sku}</div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="font-semibold tabular-nums">{fmt(precio)}</div>
-                    <div className="text-xs text-muted-foreground tabular-nums">
-                      Stock: {p.stockUbicacion} {p.unidadMedida}
-                    </div>
-                  </div>
-                  <Plus className="size-4 text-muted-foreground" />
-                </button>
-              );
-            })
-          )}
+        {/* Ayuda (el panel grande de productos se reemplazó por el autocompletar de arriba) */}
+        <div className="bg-card rounded-lg border p-4 text-sm text-muted-foreground space-y-2">
+          <p>
+            Escribe en el buscador para ver productos que coincidan en{" "}
+            <span className="font-medium text-foreground">nombre</span>,{" "}
+            <span className="font-medium text-foreground">código de barras</span> o{" "}
+            <span className="font-medium text-foreground">SKU</span>. Da clic en un
+            resultado para agregarlo al carrito.
+          </p>
+          <p>Si escaneas o tecleas un código de barras exacto, se agrega solo.</p>
+          <p className="text-xs">
+            Atajos: <span className="font-mono">F2</span> buscar ·{" "}
+            <span className="font-mono">F3</span> cliente ·{" "}
+            <span className="font-mono">F4</span> descuento ·{" "}
+            <span className="font-mono">F8</span> cobrar ·{" "}
+            <span className="font-mono">F9</span> quitar línea.
+          </p>
         </div>
       </section>
 
