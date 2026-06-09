@@ -1,24 +1,28 @@
-# Handoff de memoria de Claude (continuidad Linux → Windows)
+# Handoff de memoria de Claude (continuidad entre equipos)
 
-Este folder es un **respaldo de las memorias de Claude Code** del proyecto,
-para no perder el contexto al cambiar de sistema operativo. No es código del
-producto; se puede borrar esta rama (`meta/handoff-memoria`) cuando termines.
+Este folder es un **respaldo de las memorias de Claude Code** del proyecto, para no
+perder contexto al cambiar de máquina/SO (Linux ⇄ Windows). No es código del producto.
 
-## Cómo restaurar en Windows
+Las memorias se viajan por el repo: aquí (`.claude-handoff/memory/`) queda el snapshot;
+en cada equipo, Claude las copia a su carpeta de memoria local (cuyo `<slug>` depende de
+la ruta del proyecto, por eso conviene que Claude lo resuelva en vez de copiarlo a mano).
 
-1. Clona el repo y entra a la carpeta del proyecto.
-2. Trae esta rama: `git fetch origin meta/handoff-memoria` y
-   `git checkout meta/handoff-memoria` (o solo copia este folder).
-3. Abre Claude Code en el proyecto y dile:
+## Cómo restaurar en el equipo nuevo
+1. Clona/actualiza el repo y entra a la carpeta del proyecto:
+   `git checkout main && git pull`
+2. Abre Claude Code en el proyecto y dile:
    **"restaura mis memorias desde `.claude-handoff/memory`"**.
-   Claude copiará cada `.md` a la carpeta de memoria de ESTE equipo
-   (`%USERPROFILE%\.claude\projects\<slug>\memory\`) y dejará `MEMORY.md` al día.
-4. Vuelve a `main` y borra la rama de handoff cuando ya esté restaurado:
-   `git checkout main` y `git push origin --delete meta/handoff-memoria`.
+   Claude copiará cada `.md` a la carpeta de memoria de ESE equipo
+   (`~/.claude/projects/<slug>/memory/` en Linux/Mac, `%USERPROFILE%\.claude\projects\<slug>\memory\` en Windows)
+   y dejará `MEMORY.md` al día.
+3. Confirma en esa primera sesión los detalles del entorno (ruta, shell, Postgres) —
+   la memoria `entorno-local-jsalazar` te dice qué reconfirmar.
 
-> El `<slug>` cambia en Windows (depende de la ruta del proyecto), por eso lo más
-> fácil es que Claude lo resuelva en la primera sesión en vez de copiarlo a mano.
+## Cómo actualizar este snapshot antes de cambiar de equipo
+En el equipo donde trabajaste, dile a Claude:
+**"haz las memorias necesarias para subirlas al repo"** — Claude copia las memorias
+vivas a `.claude-handoff/memory/`, las commitea y abre PR. Mergéalo antes de moverte.
 
 ## Qué hay aquí
 Las memorias activas del proyecto (estado, decisiones, gotchas). El índice es
-`memory/MEMORY.md`.
+`memory/MEMORY.md`. Última actualización del snapshot: **2026-06-09** (Windows → Linux).

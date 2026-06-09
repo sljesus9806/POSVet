@@ -31,7 +31,7 @@ Capa B: `npm run dev` en otra terminal + `npx tsx --env-file=.env scripts/qa/30-
 3. **Guion vs API:** `sugerenciasDeProveedor` (plan PRO-05) la expone `comprasService`, no proveedores.
 4. **Diseño confirmado:** los servicios NO aplican RBAC; el enforcement vive en la capa de *actions*
    (`requirePermission`, `src/lib/auth-helpers.ts`). Capa A valida `tienePermiso`/`hasPermission`.
-5. event-bus emite sin suscriptores (no rompe nada). Facturación fuera ([[facturacion-en-pausa]]).
+5. event-bus emite sin suscriptores (no rompe nada). Facturación quedó fuera de esta corrida; luego se construyó ([[facturacion-cfdi-activada]]).
 
 Entorno: [[entorno-local-jsalazar]]. NOTA sesión: alta latencia de entrega de resultados de tool calls;
 conviene correr la suite en background y leer el archivo de salida (no bloquear en foreground).
