@@ -1,4 +1,4 @@
-<#
+﻿<#
   Ligerito — Instalación en UNA sola PC con Windows (la PC es el servidor).
   ---------------------------------------------------------------------------
   Lo corre UNA VEZ quien instala (no la usuaria final). Es idempotente: puedes
@@ -22,7 +22,9 @@
 param(
   [int]$Puerto = 3000,
   [string]$PgSuperPassword = "",
-  [string]$TokenLicencia = ""
+  [string]$TokenLicencia = "",
+  [string]$RespaldoDestino = "C:\Ligerito-Respaldos",
+  [int]$RespaldoDias = 7
 )
 
 $ErrorActionPreference = "Stop"
@@ -114,7 +116,9 @@ if ("$existeDb".Trim() -ne "1") {
 } else {
   Ok "Base '$DbName' ya existía"
 }
-$DatabaseUrl = "postgresql://${DbUser}:${DbPass}@localhost:5432/${DbName}?schema=public"
+# Usamos 127.0.0.1 (IPv4 explícito) en vez de 'localhost': en Windows 'localhost'
+# puede resolver primero a ::1 (IPv6) y el motor de Prisma a veces da P1001 ahí.
+$DatabaseUrl = "postgresql://${DbUser}:${DbPass}@127.0.0.1:5432/${DbName}?schema=public"
 
 # --- 4. Archivo .env -----------------------------------------------------
 $envPath = Join-Path $RepoRoot ".env"
@@ -168,8 +172,34 @@ try {
   # IMPORTANTE: migrar y sembrar ANTES de construir. Next prerenderiza algunas
   # páginas en el build y si tocan la BD, las tablas deben existir ya. (Si no,
   # el build truena con 'relation does not exist' en la PC del cliente.)
+  #
+  # Tolerante a un P1001 transitorio: el PRIMER intento de conexión del motor de
+  # Prisma a veces falla en Windows (Firewall/Defender inspeccionando el binario,
+  # o titubeo IPv6). Esperamos a que la BD acepte conexiones y reintentamos.
+  $prevEAP = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"  # psql/npx escriben a stderr; no queremos abortar por eso
+
+  Info "Esperando a que PostgreSQL acepte conexiones…"
+  $env:PGPASSWORD = $DbPass
+  $dbReady = $false
+  for ($i = 1; $i -le 20; $i++) {
+    & $psql -U $DbUser -h 127.0.0.1 -p 5432 -d $DbName -tAc "select 1" 2>$null | Out-Null
+    if ($LASTEXITCODE -eq 0) { $dbReady = $true; break }
+    Start-Sleep -Seconds 2
+  }
+  $env:PGPASSWORD = $PgSuperPassword
+  if ($dbReady) { Ok "La BD acepta conexiones" } else { Warn "La BD no respondió tras ~40s; intento migrar de todas formas…" }
+
   Info "Aplicando migraciones…"
-  Run $npxCmd @("prisma","migrate","deploy")
+  $migrated = $false
+  for ($i = 1; $i -le 3; $i++) {
+    & $npxCmd prisma migrate deploy
+    if ($LASTEXITCODE -eq 0) { $migrated = $true; break }
+    Warn "migrate deploy falló (intento $i/3); reintento en 3s…"
+    Start-Sleep -Seconds 3
+  }
+  $ErrorActionPreference = $prevEAP
+  if (-not $migrated) { Fail "No se pudieron aplicar las migraciones tras 3 intentos. Confirma que PostgreSQL esté arriba en 5432." }
 
   Info "Sembrando datos iniciales…"
   Run $npxCmd @("prisma","db","seed")
@@ -226,6 +256,28 @@ Set-Content -Path (Join-Path $desktop "Ligerito.url") -Encoding ASCII -Value @"
 URL=$url
 "@
 Ok "Icono 'Ligerito' en el Escritorio"
+
+# --- 8. Respaldo automático de la BD cada 30 min (Tarea Programada) -------
+Info "Programando respaldo automático de la base (cada 30 min)…"
+$respaldarPs1 = Join-Path $ScriptDir "respaldar.ps1"
+$taskRespaldo = "Ligerito - Respaldo BD"
+try {
+  $accion = New-ScheduledTaskAction -Execute "powershell.exe" `
+    -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$respaldarPs1`" -Destino `"$RespaldoDestino`" -DiasRetencion $RespaldoDias -RepoRoot `"$RepoRoot`""
+  # Repetición indefinida cada 30 min (Duration vacío = sin fin).
+  $disparador = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 30)
+  # SYSTEM: corre aunque nadie haya iniciado sesión (mientras la PC esté prendida).
+  $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+  $ajustes = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew
+  Register-ScheduledTask -TaskName $taskRespaldo -Action $accion -Trigger $disparador -Principal $principal -Settings $ajustes `
+    -Description "Respaldo de la base de Ligerito cada 30 min (retención $RespaldoDias días) -> $RespaldoDestino" -Force | Out-Null
+  Ok "Respaldo cada 30 min -> $RespaldoDestino (retención $RespaldoDias días)"
+  Start-ScheduledTask -TaskName $taskRespaldo -ErrorAction SilentlyContinue   # primer respaldo de inmediato
+} catch {
+  Warn "No pude registrar la tarea de respaldo (¿corriste como Administrador?): $($_.Exception.Message)"
+  Warn "Regístrala luego corriendo el instalador como Admin, o respalda a mano:"
+  Warn "    powershell -ExecutionPolicy Bypass -File `"$respaldarPs1`""
+}
 
 # Arrancar ya el servidor para esta primera vez.
 Info "Arrancando el servidor por primera vez…"

@@ -72,7 +72,9 @@ icono **Ligerito** que el instalador deja en el Escritorio.
 | **Ver errores** | Carpeta `deploy\windows\logs\`. |
 | **Cambiar el puerto** | `Instalar.bat -Puerto 8080` (y el favorito sería `localhost:8080`). |
 | **Activar facturación real** | Edita `.env` (`FACTURACION_MODO=facturama` + credenciales). Ver `docs/Guia-Facturacion.md`. |
-| **Respaldos** | La BD vive en PostgreSQL local; programa un respaldo con `pg_dump` (ver `deploy/README.md`). |
+| **Respaldos** | **Automáticos cada 30 min** (Tarea Programada `Ligerito - Respaldo BD`, la crea `instalar.ps1`). Van a `C:\Ligerito-Respaldos` (`.dump` comprimidos, retención 7 días) con bitácora `respaldos.log`. A mano: `powershell -ExecutionPolicy Bypass -File respaldar.ps1`. |
+| **Restaurar** un respaldo | `powershell -ExecutionPolicy Bypass -File restaurar.ps1 -Archivo "C:\Ligerito-Respaldos\posvet_AAAAMMDD_HHMMSS.dump"` (DESTRUCTIVO: reemplaza los datos actuales). |
+| **Cambiar destino/retención** de respaldos | Reinstala con `Instalar.bat -RespaldoDestino "D:\Respaldos" -RespaldoDias 14`, o edita la Tarea Programada. |
 
 ---
 
