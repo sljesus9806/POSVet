@@ -1,4 +1,4 @@
-<#
+﻿<#
   Ligerito — arranque del servidor local. Se ejecuta SOLO al iniciar sesión en
   Windows (lo registra instalar.ps1). También puedes correrlo a mano.
 

@@ -1,4 +1,4 @@
-<#
+﻿<#
   Ligerito — Instalación en UNA sola PC con Windows (la PC es el servidor).
   ---------------------------------------------------------------------------
   Lo corre UNA VEZ quien instala (no la usuaria final). Es idempotente: puedes
