@@ -114,7 +114,9 @@ if ("$existeDb".Trim() -ne "1") {
 } else {
   Ok "Base '$DbName' ya existía"
 }
-$DatabaseUrl = "postgresql://${DbUser}:${DbPass}@localhost:5432/${DbName}?schema=public"
+# Usamos 127.0.0.1 (IPv4 explícito) en vez de 'localhost': en Windows 'localhost'
+# puede resolver primero a ::1 (IPv6) y el motor de Prisma a veces da P1001 ahí.
+$DatabaseUrl = "postgresql://${DbUser}:${DbPass}@127.0.0.1:5432/${DbName}?schema=public"
 
 # --- 4. Archivo .env -----------------------------------------------------
 $envPath = Join-Path $RepoRoot ".env"
@@ -168,8 +170,34 @@ try {
   # IMPORTANTE: migrar y sembrar ANTES de construir. Next prerenderiza algunas
   # páginas en el build y si tocan la BD, las tablas deben existir ya. (Si no,
   # el build truena con 'relation does not exist' en la PC del cliente.)
+  #
+  # Tolerante a un P1001 transitorio: el PRIMER intento de conexión del motor de
+  # Prisma a veces falla en Windows (Firewall/Defender inspeccionando el binario,
+  # o titubeo IPv6). Esperamos a que la BD acepte conexiones y reintentamos.
+  $prevEAP = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"  # psql/npx escriben a stderr; no queremos abortar por eso
+
+  Info "Esperando a que PostgreSQL acepte conexiones…"
+  $env:PGPASSWORD = $DbPass
+  $dbReady = $false
+  for ($i = 1; $i -le 20; $i++) {
+    & $psql -U $DbUser -h 127.0.0.1 -p 5432 -d $DbName -tAc "select 1" 2>$null | Out-Null
+    if ($LASTEXITCODE -eq 0) { $dbReady = $true; break }
+    Start-Sleep -Seconds 2
+  }
+  $env:PGPASSWORD = $PgSuperPassword
+  if ($dbReady) { Ok "La BD acepta conexiones" } else { Warn "La BD no respondió tras ~40s; intento migrar de todas formas…" }
+
   Info "Aplicando migraciones…"
-  Run $npxCmd @("prisma","migrate","deploy")
+  $migrated = $false
+  for ($i = 1; $i -le 3; $i++) {
+    & $npxCmd prisma migrate deploy
+    if ($LASTEXITCODE -eq 0) { $migrated = $true; break }
+    Warn "migrate deploy falló (intento $i/3); reintento en 3s…"
+    Start-Sleep -Seconds 3
+  }
+  $ErrorActionPreference = $prevEAP
+  if (-not $migrated) { Fail "No se pudieron aplicar las migraciones tras 3 intentos. Confirma que PostgreSQL esté arriba en 5432." }
 
   Info "Sembrando datos iniciales…"
   Run $npxCmd @("prisma","db","seed")
