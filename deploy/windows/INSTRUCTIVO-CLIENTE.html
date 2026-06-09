@@ -166,7 +166,7 @@ git archive --format=zip --output=/tmp/ligerito-cliente.zip main</code></pre>
     <i>(o doble clic en <code>Instalar.bat</code> → Ejecutar como administrador; te pide la contraseña oculta.)</i>
   </li>
   <li>Espera unos minutos: instala Node si falta, crea la base, instala dependencias, genera Prisma,
-    migra, siembra, <b>construye</b>, instala la licencia y deja el arranque automático.</li>
+    migra, siembra, <b>construye</b>, instala la licencia, deja el arranque automático y programa los <b>respaldos cada 30 min</b>.</li>
   <li>Al terminar se abre Chrome en <code>http://localhost:3000</code>.</li>
 </ol>
 </div>
@@ -188,10 +188,32 @@ git archive --format=zip --output=/tmp/ligerito-cliente.zip main</code></pre>
   <li>Registro de errores: carpeta <code>deploy\windows\logs\</code>.</li>
 </ul>
 
-<h2>Respaldos (importante)</h2>
-<p>La base vive en PostgreSQL local. Programa un respaldo con <code>pg_dump</code>, por ejemplo:</p>
-<pre><code>&amp; "C:\Program Files\PostgreSQL\17\bin\pg_dump.exe" -U posvet -h 127.0.0.1 posvet `
-   > C:\respaldos\posvet_backup.sql</code></pre>
+<h2>Respaldos automáticos (ya quedan configurados)</h2>
+<p>El instalador deja una <b>Tarea Programada de Windows</b> (<code>Ligerito - Respaldo BD</code>) que
+respalda la base <b>cada 30 minutos</b>, corra o no la app, mientras la PC esté prendida.</p>
+<table>
+  <tr><th>Dato</th><th>Valor</th></tr>
+  <tr><td>Carpeta</td><td><code>C:\Ligerito-Respaldos</code></td></tr>
+  <tr><td>Formato</td><td><code>.dump</code> comprimido (pg_dump custom) · nombre <code>posvet_AAAAMMDD_HHMMSS.dump</code></td></tr>
+  <tr><td>Retención</td><td>7 días (los más viejos se borran solos)</td></tr>
+  <tr><td>Bitácora</td><td><code>C:\Ligerito-Respaldos\respaldos.log</code></td></tr>
+  <tr><td>Respaldo manual</td><td><code>powershell -ExecutionPolicy Bypass -File respaldar.ps1</code></td></tr>
+</table>
+<div class="callout warn">
+  <b>Recomendación de seguridad</b>
+  Los respaldos quedan en el MISMO disco de la PC. Copia de vez en cuando la carpeta
+  <code>C:\Ligerito-Respaldos</code> a un USB o la nube. Para mandarlos directo a un USB fijo,
+  reinstala con <code>Instalar.bat -RespaldoDestino "D:\Respaldos"</code>.
+</div>
+<h3>Restaurar desde un respaldo (recuperación)</h3>
+<div class="callout dang">
+  <b>DESTRUCTIVO — reemplaza los datos actuales</b>
+  Úsalo solo para recuperar tras una pérdida. Cierra la app antes.
+</div>
+<pre><code>cd C:\Ligerito\deploy\windows
+.\restaurar.ps1 -Archivo "C:\Ligerito-Respaldos\posvet_20260609_120000.dump"</code></pre>
+<p>Te pide escribir <code>SI</code> para confirmar; al terminar, reinicia el servidor
+(<code>iniciar.ps1</code>).</p>
 
 <h2>Solución de problemas</h2>
 <table>

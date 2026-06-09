@@ -22,7 +22,9 @@
 param(
   [int]$Puerto = 3000,
   [string]$PgSuperPassword = "",
-  [string]$TokenLicencia = ""
+  [string]$TokenLicencia = "",
+  [string]$RespaldoDestino = "C:\Ligerito-Respaldos",
+  [int]$RespaldoDias = 7
 )
 
 $ErrorActionPreference = "Stop"
@@ -254,6 +256,28 @@ Set-Content -Path (Join-Path $desktop "Ligerito.url") -Encoding ASCII -Value @"
 URL=$url
 "@
 Ok "Icono 'Ligerito' en el Escritorio"
+
+# --- 8. Respaldo automático de la BD cada 30 min (Tarea Programada) -------
+Info "Programando respaldo automático de la base (cada 30 min)…"
+$respaldarPs1 = Join-Path $ScriptDir "respaldar.ps1"
+$taskRespaldo = "Ligerito - Respaldo BD"
+try {
+  $accion = New-ScheduledTaskAction -Execute "powershell.exe" `
+    -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$respaldarPs1`" -Destino `"$RespaldoDestino`" -DiasRetencion $RespaldoDias -RepoRoot `"$RepoRoot`""
+  # Repetición indefinida cada 30 min (Duration vacío = sin fin).
+  $disparador = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 30)
+  # SYSTEM: corre aunque nadie haya iniciado sesión (mientras la PC esté prendida).
+  $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+  $ajustes = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew
+  Register-ScheduledTask -TaskName $taskRespaldo -Action $accion -Trigger $disparador -Principal $principal -Settings $ajustes `
+    -Description "Respaldo de la base de Ligerito cada 30 min (retención $RespaldoDias días) -> $RespaldoDestino" -Force | Out-Null
+  Ok "Respaldo cada 30 min -> $RespaldoDestino (retención $RespaldoDias días)"
+  Start-ScheduledTask -TaskName $taskRespaldo -ErrorAction SilentlyContinue   # primer respaldo de inmediato
+} catch {
+  Warn "No pude registrar la tarea de respaldo (¿corriste como Administrador?): $($_.Exception.Message)"
+  Warn "Regístrala luego corriendo el instalador como Admin, o respalda a mano:"
+  Warn "    powershell -ExecutionPolicy Bypass -File `"$respaldarPs1`""
+}
 
 # Arrancar ya el servidor para esta primera vez.
 Info "Arrancando el servidor por primera vez…"
