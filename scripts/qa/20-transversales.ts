@@ -125,4 +125,29 @@ export async function run(): Promise<void> {
   }
   // Hallazgo a medir, no un fallo de la suite: registramos el resultado observado.
   check(true, `exitosas=${exitosas}, stock final=${stockFin}${colisionFolio ? " · colisión de folio en la concurrente" : ""}${exitosas === 2 ? " · SOBREVENTA" : ""}`);
+
+  // CON-02 — folio concurrency-safe (verifica el fix del lock asesor por serie):
+  // con stock para todas, N ventas simultáneas del mismo producto deben tener TODAS
+  // éxito y con folios distintos (sin colisión de folio ni sobreventa).
+  caso("CON-02", "concurrencia: N ventas simultáneas con stock suficiente → todas exitosas, folios únicos");
+  const N = 8;
+  const prod2 = await productosService.crear(
+    { sku: "CONC-QA-002", nombre: "Producto Concurrencia QA 2", unidadMedida: "PZA", tipo: "ACCESORIO", ivaAplicable: 0, ultimoCosto: 10, precios: [{ tipo: "PUBLICO", precio: 100 }] },
+    { usuarioId },
+  );
+  await inventarioService.registrarEntrada({ productoId: prod2.id, ubicacionId: SEED.ubicacionTienda, cantidad: N, costoUnitario: 10 }, { usuarioId });
+  const venderN = () => ventasService.crearVenta(
+    { cajaId: caja.id, lineas: [{ productoId: prod2.id, cantidad: 1 }], pagos: [{ forma: "EFECTIVO", monto: 100 }] },
+    { usuarioId },
+  );
+  const res2 = await Promise.allSettled(Array.from({ length: N }, venderN));
+  const folios2 = res2.flatMap((r) => (r.status === "fulfilled" ? [r.value.folio] : []));
+  const fallos2 = res2.flatMap((r) =>
+    r.status === "rejected" ? [r.reason instanceof Error ? `${r.reason.name}: ${r.reason.message}` : String(r.reason)] : [],
+  );
+  const foliosUnicos = new Set(folios2).size === folios2.length;
+  const stockFin2 = await stock(prod2.id, SEED.ubicacionTienda);
+  check(folios2.length === N, `las ${N} ventas concurrentes tuvieron éxito (exitosas=${folios2.length}${fallos2.length ? `, fallos: ${fallos2.join(" | ")}` : ""})`);
+  check(foliosUnicos && folios2.length > 0, `folios únicos sin colisión (${folios2.length} folios, ${new Set(folios2).size} distintos)`);
+  check(stockFin2 === 0, `stock descontado exacto sin sobreventa (final=${stockFin2})`);
 }
