@@ -10,9 +10,8 @@ metadata:
 Mejora "Dashboard de KPIs" (2026-05-30): convierte la pantalla de inicio (que seguía siendo el
 placeholder de Fase 0) en un panel real. Plan en `~/.claude/plans/immutable-wishing-codd.md`.
 
-**Estado: PR #19 abierto** (https://github.com/sljesus9806/POSVet/pull/19), branch
-`feature/dashboard-kpis` pusheada. `npm run build` ✓ limpio (52 rutas, sin errores de tipos ni
-lint). **Pendiente: el usuario revisa y mergea** (yo nunca mergeo).
+**Estado: PR #19 MERGEADO** (2026-05-30, ya en `main`). branch
+`feature/dashboard-kpis`. `npm run build` ✓ limpio (52 rutas, sin errores de tipos ni lint).
 
 **Archivos:**
 - `src/components/dashboard/kpi-card.tsx` (nuevo) — componente `KpiCard` reutilizable, sin estado,
@@ -38,4 +37,4 @@ usando solo iconos ya presentes en `sidebar-nav.tsx`. El build confirmó que los
 
 **Entorno:** esta máquina (usuario jsalazar) ya tiene Node v26 + `node_modules` instalados.
 
-Relacionado: [[posvet-estado-y-mejoras]], [[facturacion-en-pausa]].
+Relacionado: [[posvet-estado-y-mejoras]], [[facturacion-cfdi-activada]].

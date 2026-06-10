@@ -9,7 +9,7 @@ metadata:
 
 El POS se generalizó: ya **no es solo para veterinarias**, ahora es multi-giro (abarrotes, farmacia, veterinaria, papelería…). El **software se llama "Ligerito"** (el nombre del negocio lo pone cada cliente en `Empresa.razonSocial`, que sigue siendo configurable).
 
-Decisiones (PR #34, rama `feature/pos-general`, abierto 2026-06-04, pendiente revisión/merge del usuario):
+Decisiones (PR #34, rama `feature/pos-general`, **MERGEADO 2026-06-05**):
 - **Niveles de precio/cliente:** `PUBLICO, MAYOREO, DISTRIBUIDOR` (antes `VETERINARIO`/`GRANJA`). Migración no destructiva `20260604120000_tipos_distribuidor` (RENAME VALUE + recrea enum sin GRANJA; GRANJA→PUBLICO, VETERINARIO→DISTRIBUIDOR).
 - **Campos especializados de producto** (`especie`, `requiereReceta`, `sustanciaControlada`, `viaAdministracion`, `laboratorio`) NO se borran: quedan opcionales en una sección plegable del form, para que sirvan a farmacia/vet pero no estorben a abarrotes.
 
