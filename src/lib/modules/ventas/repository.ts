@@ -1,6 +1,20 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../shared/db";
 
+/**
+ * Lock asesor a nivel de transacción para serializar la generación de un folio
+ * correlativo (que se calcula con COUNT, no atómico). Dos transacciones de la misma
+ * serie no pueden calcular el mismo número: la 2ª se bloquea hasta que la 1ª hace
+ * commit y entonces cuenta incluyendo la fila recién creada. Se libera solo al
+ * terminar la transacción (commit o rollback). No requiere migración; `hashtext`
+ * mapea la serie a un entero estable que sirve de llave del lock.
+ */
+async function lockSerieFolio(tx: Prisma.TransactionClient, serie: string): Promise<void> {
+  // $executeRaw (no $queryRaw): pg_advisory_xact_lock devuelve `void` y $queryRaw no
+  // puede deserializar esa columna; $executeRaw solo ejecuta y no lee columnas.
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${serie})::bigint)`;
+}
+
 const ventaInclude = {
   caja: { select: { id: true, folio: true } },
   ubicacion: { select: { id: true, nombre: true } },
@@ -116,16 +130,23 @@ export const ventasRepository = {
   },
 
   // Generador de folios alineado al de transferencias: anual + correlativo.
+  // El correlativo se calcula con COUNT (no atómico): para que dos transacciones
+  // concurrentes no obtengan el mismo número, serializamos por serie con un lock
+  // asesor de transacción (ver lockSerieFolio). Sin migración; preserva el formato.
   async proximoFolioVenta(tx: Prisma.TransactionClient) {
     const año = new Date().getFullYear();
-    const count = await tx.venta.count({ where: { folio: { startsWith: `V-${año}-` } } });
-    return `V-${año}-${String(count + 1).padStart(6, "0")}`;
+    const serie = `V-${año}-`;
+    await lockSerieFolio(tx, serie);
+    const count = await tx.venta.count({ where: { folio: { startsWith: serie } } });
+    return `${serie}${String(count + 1).padStart(6, "0")}`;
   },
 
   async proximoFolioCaja(tx: Prisma.TransactionClient) {
     const año = new Date().getFullYear();
-    const count = await tx.caja.count({ where: { folio: { startsWith: `C-${año}-` } } });
-    return `C-${año}-${String(count + 1).padStart(5, "0")}`;
+    const serie = `C-${año}-`;
+    await lockSerieFolio(tx, serie);
+    const count = await tx.caja.count({ where: { folio: { startsWith: serie } } });
+    return `${serie}${String(count + 1).padStart(5, "0")}`;
   },
 
   // Catálogo vendible: productos activos con precios + stock en una ubicación

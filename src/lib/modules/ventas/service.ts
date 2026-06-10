@@ -495,8 +495,10 @@ export const ventasService = {
     // y el crédito no genera cambio.
 
     // Transacción: crear venta + líneas + pagos + descontar inventario atómicamente.
-    // Reintenta ante colisión de folio (correlativo no atómico, protegido por @unique);
-    // mismo patrón que compras/cobranza/cuentas-pagar. Ver issue #20.
+    // El folio se serializa con un lock asesor por serie (proximoFolioVenta), así que
+    // bajo condiciones normales no hay colisión. El reintento ante P2002 de folio queda
+    // como red de seguridad (defensa en profundidad, p. ej. inserciones fuera de este
+    // camino). Ver issue #20.
     let venta: VentaConRelaciones | undefined;
     let alertasBajoStock: Array<{ productoId: string; ubicacionId: string; stock: number; stockMinimo: number }> = [];
     let folioError: unknown;
