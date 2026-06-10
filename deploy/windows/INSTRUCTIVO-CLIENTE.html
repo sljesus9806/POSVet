@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Instructivo — Instalar Ligerito en la PC del cliente</title>
+<title>Instructivo — Instalar Ligerito en una PC con Windows</title>
 <style>
   :root{
     --azul:#1e40af; --azul2:#3b82f6; --coral:#f97362;
@@ -49,6 +49,9 @@
   th{background:#f1f5f9; color:var(--azul);}
   .step{background:#f8fafc; border:1px solid var(--linea); border-radius:8px; padding:4px 16px; margin:12px 0;}
   .cred{font-family:Consolas,monospace; background:#eef2ff; padding:2px 6px; border-radius:4px;}
+  .roles{display:flex; gap:12px; margin:14px 0;}
+  .roles .rol{flex:1; border:1px solid var(--linea); border-radius:8px; padding:10px 14px; background:#f8fafc; font-size:13px;}
+  .roles .rol b{color:var(--azul);}
   footer{margin-top:36px; padding-top:14px; border-top:1px solid var(--linea);
     color:var(--gris); font-size:12px; text-align:center;}
   .toc{background:#f1f5f9; border-radius:8px; padding:12px 18px; font-size:13.5px;}
@@ -67,190 +70,282 @@
 <div class="page">
 
 <header>
-  <h1>Instalar Ligerito en la PC del cliente <span class="badge">POS</span></h1>
-  <div class="sub">Instructivo completo · despliegue en una sola PC con Windows (la PC es el servidor) · v1 — 2026-06-09</div>
+  <h1>Instalar Ligerito en una PC con Windows <span class="badge">POS</span></h1>
+  <div class="sub">Instructivo paso a paso · una sola PC con Windows (la PC es el servidor) · v2 — 2026-06-10</div>
 </header>
 
 <div class="callout warn noprint">
-  <b>💡 Para guardarlo como PDF</b>
+  <b>💡 Para guardar este instructivo como PDF</b>
   Abre este archivo en Google Chrome y pulsa <code>Ctrl + P</code> → en <i>Destino</i> elige
-  <b>“Guardar como PDF”</b> → Guardar.
+  <b>“Guardar como PDF”</b> → Guardar. (El PDF de la carpeta se genera así; si editas este HTML,
+  vuelve a generarlo.)
+</div>
+
+<div class="callout ok">
+  <b>Cómo funciona, en una frase</b>
+  Una sola computadora con Windows hace de <b>servidor</b>; la persona que la usa entra con
+  <b>Google Chrome</b> a <code>http://localhost:3000</code>. <b>Sin Docker, sin internet en el día a
+  día, sin ventanas raras.</b> Solo la <i>instalación</i> necesita internet.
+</div>
+
+<div class="roles">
+  <div class="rol"><b>🛠️ Quien instala</b> (tú, una sola vez): hace las Fases 1 a 4 de abajo.
+    Necesita la PC Linux con la llave de licencia y un rato con internet en la PC del cliente.</div>
+  <div class="rol"><b>🧑‍💼 Quien lo usa</b> (el cliente, todos los días): solo prende la compu y abre
+    Chrome. Ve la sección <i>“Uso diario”</i>.</div>
 </div>
 
 <div class="toc">
   <b>Contenido:</b>
-  Fase 0 — Dejar el instalador arreglado en <code>main</code> ·
   Fase 1 — En Linux: preparar la licencia ·
   Fase 2 — Armar el paquete (USB) ·
   Fase 3 — Instalar en la PC del cliente ·
   Fase 4 — Primer arranque ·
-  Uso diario · Respaldos · Solución de problemas
+  Uso diario · Respaldos · Mantenimiento · Solución de problemas
 </div>
 
 <div class="callout dang">
   <b>⚠️ Lo único que NO puede faltar: el token de licencia</b>
-  Sin <code>licencia.token</code> la app se queda bloqueada en la pantalla <code>/licencia</code>.
-  El token se emite en la máquina <b>Linux</b> (donde está la llave privada) y solo viajas con el
-  token al cliente. <b>Nunca lleves la llave privada al cliente.</b>
+  La app tiene candado: <b>sin <code>licencia.token</code> se queda bloqueada</b> en la pantalla
+  <code>/licencia</code> y no deja entrar. El token se emite en tu PC <b>Linux</b> (la que tiene la
+  llave privada) y solo viajas con el <i>token</i> al cliente. <b>Nunca lleves la llave privada a la
+  PC del cliente.</b>
 </div>
 
-<h2><span class="n">0</span>Dejar el instalador arreglado en <code>main</code> (una sola vez)</h2>
-<p>En GitHub, <b>mergea el PR&nbsp;#39</b>. Trae los arreglos probados en Windows real (codificación
-UTF-8 con BOM, orden de migraciones, reintento de conexión a la base y uso de <code>127.0.0.1</code>).</p>
-<div class="callout dang">
-  <b>Sin esto el instalador ni siquiera arranca</b>
-  La versión anterior truena con un error de PowerShell (<code>Unexpected token</code>) por la
-  codificación del archivo. Usa siempre la versión de <code>main</code> con el PR&nbsp;#39 ya integrado.
+<div class="callout ok">
+  <b>✅ Antes de salir hacia el cliente, lleva listo:</b>
+  <ul style="margin-top:6px;">
+    <li>El <b>ZIP del proyecto</b> (Fase 2) y tu <b>archivo <code>licencia.token</code></b> (Fase 1) en un USB.</li>
+    <li>Decidido el <b>nombre del negocio</b> (va dentro del token) y la <b>contraseña del usuario <code>postgres</code></b> que usarás.</li>
+    <li>Que la PC del cliente tendrá <b>internet</b> durante la instalación (después ya no).</li>
+  </ul>
 </div>
 
-<h2><span class="n">1</span>En la máquina <b>Linux</b> — preparar la licencia</h2>
+<h2><span class="n">1</span>En tu PC <b>Linux</b> — preparar la licencia</h2>
 <div class="step">
 <ol>
-  <li>Entra al repo y trae lo último:
+  <li>Entra al repo y trae lo último de <code>main</code> (ahí ya están todos los arreglos del
+    instalador de Windows):
     <pre><code>cd ~/POSVet        # o donde lo tengas
 git checkout main &amp;&amp; git pull</code></pre>
   </li>
-  <li><b>Verifica que la llave privada es la correcta</b> (la que empareja con <code>keys.ts</code>):
-    <pre><code>openssl pkey -in .licencia/private.pem -pubout</code></pre>
-    La pública debe <b>empezar con</b> <code>MCowBQYDK2VwAyEAsXfC9xDWowQj…</code> y coincidir con la de
-    <code>src/lib/modules/licencia/keys.ts</code>.
+  <li><b>Comprueba que tienes la llave privada correcta</b> (la que empareja con la pública que la app
+    valida en <code>keys.ts</code>):
+    <pre><code>openssl pkey -in .licencia/private.pem -pubout -outform DER | base64 -w0</code></pre>
+    El resultado debe ser exactamente:
+    <pre><code>MCowBQYDK2VwAyEAsXfC9xDWowQjrKTIltQk4SV6ttc9TRwBKhhO/rlIwlM=</code></pre>
     <div class="callout warn">
-      <b>Si NO coincide</b>
-      Usa el <code>private.pem</code> real del repo de licencias:
-      <code>~/posvet-licencias/.licencia/private.pem</code>. <b>No</b> regeneres llaves
-      (<code>lic:keygen</code>): invalidaría los clientes y tokens ya emitidos.
+      <b>Si no coincide</b>
+      Usa la llave real del repo de licencias: <code>~/posvet-licencias/.licencia/private.pem</code>
+      (también empareja). <b>Nunca</b> corras <code>lic:keygen</code> ni cambies <code>keys.ts</code>:
+      invalidaría a todos los clientes y tokens ya emitidos.
     </div>
   </li>
-  <li>Emite el token offline (larga duración) a nombre del negocio del cliente:
+  <li>Emite el token <b>offline de larga duración</b> a nombre del negocio del cliente
+    (<code>--meses 120</code> = 10 años):
     <pre><code>npm run lic:emitir -- --cliente "NOMBRE DEL NEGOCIO" --modo offline --meses 120</code></pre>
-    Copia el token impreso y guárdalo en un archivo llamado <b><code>licencia.token</code></b>.
+    El comando imprime el token y lo guarda en <code>.licencia/emitidas/</code>.
+  </li>
+  <li>Copia ese token a un archivo llamado <b><code>licencia.token</code></b> (lo necesitarás en la
+    Fase 3). Por ejemplo, tomando el último emitido:
+    <pre><code>cp .licencia/emitidas/$(ls -t .licencia/emitidas/*.lic | head -1 | xargs basename) /tmp/licencia.token</code></pre>
   </li>
 </ol>
 </div>
+<div class="callout ok">
+  <b>Por qué offline y 10 años</b>
+  El cliente trabaja sin internet; una licencia offline perpetua-renovable evita que se bloquee sola.
+  La identidad “Licenciado a: NOMBRE DEL NEGOCIO” queda visible dentro de la app.
+</div>
 
 <h2><span class="n">2</span>Armar el paquete para el cliente (USB)</h2>
-<p>Llevas el <b>código (con el fix de #39)</b> + el <b>token</b>, pero <b>ni</b> <code>node_modules</code>
-<b>ni</b> la llave privada. Desde Linux, exporta solo lo versionado:</p>
+<p>Llevas el <b>código</b> + el <b>token</b>, pero <b>ni</b> <code>node_modules</code>, <b>ni</b> la
+  llave privada, <b>ni</b> <code>.env</code> (todo eso se genera en la PC del cliente). Desde Linux,
+  exporta solo lo versionado de <code>main</code>:</p>
 <pre><code>cd ~/POSVet
 git archive --format=zip --output=/tmp/ligerito-cliente.zip main</code></pre>
-<p>Copia al USB ese <code>ligerito-cliente.zip</code> <b>y</b> tu <code>licencia.token</code>.</p>
+<p>Copia al USB <b>dos cosas</b>: ese <code>ligerito-cliente.zip</code> <b>y</b> tu
+  <code>licencia.token</code>.</p>
 <div class="callout ok">
-  <b>Por qué así</b>
-  <code>git archive</code> no incluye <code>node_modules</code>, ni <code>.licencia</code>, ni
-  <code>.env</code> (se generan en el cliente). Y evitas tener que iniciar sesión en GitHub desde
-  la compu del cliente.
+  <b>Por qué con <code>git archive</code></b>
+  Genera un ZIP limpio (sin <code>node_modules</code>, sin <code>.licencia</code>, sin
+  <code>.env</code>) y no tienes que iniciar sesión en GitHub desde la PC del cliente. El motor de la
+  base de datos (Prisma) es por sistema operativo, por eso la app <b>se construye en Windows</b>
+  durante la instalación y no se puede mandar ya compilada desde Linux.
 </div>
 
 <h2><span class="n">3</span>Instalar en la <b>PC del cliente</b> (Windows)</h2>
 
-<h3>Prerrequisitos</h3>
+<h3>Requisitos</h3>
 <ul>
-  <li>Windows 10/11 (incluye <code>winget</code>).</li>
-  <li><b>Internet</b> — solo durante la instalación; el uso diario es 100% sin conexión.</li>
-  <li><b>PostgreSQL</b>: recomendado instalarlo <b>tú</b> antes desde
-    <span class="cred">postgresql.org/download/windows</span> y <b>definir una contraseña para el
-    usuario <code>postgres</code> que vas a recordar</b>. (Si no, el script lo instala con winget y
-    debes anotar la contraseña que pida el asistente.)</li>
-  <li><b>Node</b>: lo instala el script solo si falta.</li>
+  <li>Windows 10 u 11 (ya traen <code>winget</code>, el instalador de apps de Microsoft).</li>
+  <li><b>Internet</b> — solo durante la instalación. El uso diario es 100% sin conexión.</li>
+  <li><b>PostgreSQL</b>: el instalador lo pone solo con <code>winget</code> (versión 17). Si prefieres
+    control, instálalo tú antes desde
+    <span class="cred">postgresql.org/download/windows</span> y <b>anota la contraseña del usuario
+    <code>postgres</code></b> que definas — la pedirá el instalador.</li>
+  <li><b>Node.js</b>: lo instala el script solo si falta. No tienes que hacer nada.</li>
 </ul>
 
 <h3>Pasos</h3>
 <div class="step">
 <ol>
-  <li>Descomprime el ZIP en una ruta simple, por ejemplo <code>C:\Ligerito</code>.</li>
-  <li>Copia tu <code>licencia.token</code> a <code>C:\Ligerito\deploy\windows\licencia.token</code>.</li>
-  <li>Abre <b>PowerShell como Administrador</b> (clic derecho → Ejecutar como administrador).</li>
-  <li>Corre el instalador con la contraseña de <code>postgres</code>:
-    <pre><code>cd C:\Ligerito\deploy\windows
-.\instalar.ps1 -Puerto 3000 -PgSuperPassword "LA_CONTRASEÑA_DE_POSTGRES"</code></pre>
-    <i>(o doble clic en <code>Instalar.bat</code> → Ejecutar como administrador; te pide la contraseña oculta.)</i>
+  <li><b>Descomprime</b> el ZIP en una ruta simple, por ejemplo <code>C:\Ligerito</code>.
+    (Clic derecho en el ZIP → <i>Extraer todo</i> → escribe <code>C:\Ligerito</code>.)</li>
+  <li><b>Copia</b> tu <code>licencia.token</code> del USB a esta ruta exacta:
+    <pre><code>C:\Ligerito\deploy\windows\licencia.token</code></pre>
   </li>
-  <li>Espera unos minutos: instala Node si falta, crea la base, instala dependencias, genera Prisma,
-    migra, siembra, <b>construye</b>, instala la licencia, deja el arranque automático y programa los <b>respaldos cada 30 min</b>.</li>
-  <li>Al terminar se abre Chrome en <code>http://localhost:3000</code>.</li>
+  <li>Abre <b>PowerShell como Administrador</b>: botón Inicio → escribe <code>powershell</code> →
+    clic derecho en <i>Windows PowerShell</i> → <b>Ejecutar como administrador</b>.
+    (Administrador es necesario para instalar Node/PostgreSQL y programar los respaldos.)</li>
+  <li><b>Entra a la carpeta y corre el instalador</b> con la contraseña de <code>postgres</code>:
+    <pre><code>cd C:\Ligerito\deploy\windows
+.\instalar.ps1 -PgSuperPassword "LA_CONTRASEÑA_DE_POSTGRES"</code></pre>
+    <i>Alternativa sin escribir comandos:</i> en el Explorador, clic derecho en
+    <code>Instalar.bat</code> → <b>Ejecutar como administrador</b>; te pedirá la contraseña oculta.
+    <div class="callout warn">
+      <b>¿Otro puerto?</b> Añade <code>-Puerto 8080</code> (entonces el favorito sería
+      <code>localhost:8080</code>). Por defecto es <b>3000</b>.
+    </div>
+  </li>
+  <li><b>Espera unos minutos.</b> El instalador hace todo solo, en este orden:
+    <ul>
+      <li>Instala Node y PostgreSQL si faltan, y deja el servicio de Postgres en arranque automático.</li>
+      <li>Crea la base de datos <code>posvet</code> y su usuario.</li>
+      <li>Genera el <code>.env</code> de producción (con una clave de sesión nueva).</li>
+      <li>Instala dependencias, <b>migra</b> y <b>siembra</b> datos, y <b>construye</b> la app.</li>
+      <li>Instala la licencia desde tu <code>licencia.token</code>.</li>
+      <li>Deja el <b>arranque automático</b> al iniciar sesión + un icono <b>Ligerito</b> en el Escritorio.</li>
+      <li>Programa el <b>respaldo automático cada 30 min</b>.</li>
+    </ul>
+  </li>
+  <li>Al terminar, <b>se abre Chrome solo</b> en <code>http://localhost:3000</code>. Sigue a la Fase 4.</li>
+</ol>
+</div>
+<div class="callout ok">
+  <b>El instalador es repetible</b>
+  Si algo se interrumpe (se cae el internet, contraseña equivocada, etc.), <b>vuélvelo a correr</b>:
+  no rompe nada y retoma lo que falte. Conserva la base y el <code>.env</code> que ya existan.
+</div>
+
+<h2><span class="n">4</span>Primer arranque y configuración</h2>
+<div class="step">
+<ol>
+  <li>En Chrome, entra con el usuario de fábrica:
+    <span class="cred">admin@posvet.local</span> / <span class="cred">admin12345</span>.</li>
+  <li><b>Cambia la contraseña</b> de inmediato en el menú <i>Usuarios</i>.</li>
+  <li>En <i>Configuración</i>, escribe el <b>nombre / razón social del negocio</b>. (La marca de la app
+    es “Ligerito”; el nombre del negocio se pone aquí y sale en tickets y reportes.)</li>
+  <li>Confirma que <b>no</b> te manda a la pantalla <code>/licencia</code>. Si lo hace, ve a
+    <i>“Solución de problemas”</i>.</li>
 </ol>
 </div>
 
-<h2><span class="n">4</span>Primer arranque</h2>
-<ul>
-  <li>Entra con <span class="cred">admin@posvet.local</span> / <span class="cred">admin12345</span>.</li>
-  <li><b>Cambia la contraseña</b> en <i>Usuarios</i> de inmediato.</li>
-  <li>En <i>Configuración</i>, pon el nombre / razón social del negocio (la marca de la app es
-    “Ligerito”; el nombre del negocio se configura aquí).</li>
-  <li>Confirma que <b>no</b> te manda a <code>/licencia</code>. Si lo hace, ve a “Solución de problemas”.</li>
-</ul>
-
 <h2>Uso diario (para el cliente)</h2>
 <ul>
-  <li><b>Prende la compu</b> → el servidor arranca solo y abre la app.</li>
-  <li>Si la cierra: ícono <b>Ligerito</b> del escritorio, o el favorito <code>http://localhost:3000</code>.</li>
-  <li>Reiniciar el servidor a mano: doble clic en <code>deploy\windows\iniciar.ps1</code>.</li>
-  <li>Registro de errores: carpeta <code>deploy\windows\logs\</code>.</li>
+  <li><b>Prende la compu</b> → el servidor arranca solo y abre la app en Chrome.</li>
+  <li>Si cierras la ventana: abre el icono <b>Ligerito</b> del Escritorio, o el favorito
+    <code>http://localhost:3000</code>.</li>
+  <li>No hay que abrir terminales ni nada técnico.</li>
+  <li>Sugerencia: deja <code>http://localhost:3000</code> en <b>Favoritos de Chrome</b>.</li>
 </ul>
+<div class="callout warn">
+  <b>Reiniciar el servidor a mano</b> (rara vez): doble clic en
+  <code>C:\Ligerito\deploy\windows\iniciar.ps1</code>. Los errores quedan en
+  <code>C:\Ligerito\deploy\windows\logs\</code>.
+</div>
 
 <h2>Respaldos automáticos (ya quedan configurados)</h2>
 <p>El instalador deja una <b>Tarea Programada de Windows</b> (<code>Ligerito - Respaldo BD</code>) que
-respalda la base <b>cada 30 minutos</b>, corra o no la app, mientras la PC esté prendida.</p>
+  respalda la base <b>cada 30 minutos</b>, corra o no la app, mientras la PC esté prendida.</p>
 <table>
   <tr><th>Dato</th><th>Valor</th></tr>
   <tr><td>Carpeta</td><td><code>C:\Ligerito-Respaldos</code></td></tr>
-  <tr><td>Formato</td><td><code>.dump</code> comprimido (pg_dump custom) · nombre <code>posvet_AAAAMMDD_HHMMSS.dump</code></td></tr>
+  <tr><td>Formato</td><td><code>.dump</code> comprimido (pg_dump) · nombre <code>posvet_AAAAMMDD_HHMMSS.dump</code></td></tr>
   <tr><td>Retención</td><td>7 días (los más viejos se borran solos)</td></tr>
   <tr><td>Bitácora</td><td><code>C:\Ligerito-Respaldos\respaldos.log</code></td></tr>
-  <tr><td>Respaldo manual</td><td><code>powershell -ExecutionPolicy Bypass -File respaldar.ps1</code></td></tr>
+  <tr><td>Respaldo a mano</td><td><code>powershell -ExecutionPolicy Bypass -File respaldar.ps1</code></td></tr>
 </table>
 <div class="callout warn">
   <b>Recomendación de seguridad</b>
   Los respaldos quedan en el MISMO disco de la PC. Copia de vez en cuando la carpeta
-  <code>C:\Ligerito-Respaldos</code> a un USB o la nube. Para mandarlos directo a un USB fijo,
-  reinstala con <code>Instalar.bat -RespaldoDestino "D:\Respaldos"</code>.
+  <code>C:\Ligerito-Respaldos</code> a un USB o a la nube. Para mandarlos directo a otra unidad fija,
+  reinstala con <code>.\instalar.ps1 -RespaldoDestino "D:\Respaldos" -RespaldoDias 14</code>.
 </div>
 <h3>Restaurar desde un respaldo (recuperación)</h3>
 <div class="callout dang">
   <b>DESTRUCTIVO — reemplaza los datos actuales</b>
-  Úsalo solo para recuperar tras una pérdida. Cierra la app antes.
+  Úsalo solo para recuperar tras una pérdida, y cierra la app antes.
 </div>
 <pre><code>cd C:\Ligerito\deploy\windows
-.\restaurar.ps1 -Archivo "C:\Ligerito-Respaldos\posvet_20260609_120000.dump"</code></pre>
-<p>Te pide escribir <code>SI</code> para confirmar; al terminar, reinicia el servidor
-(<code>iniciar.ps1</code>).</p>
+.\restaurar.ps1 -Archivo "C:\Ligerito-Respaldos\posvet_20260610_120000.dump"</code></pre>
+<p>Te pide escribir <code>SI</code> para confirmar; al terminar, reinicia el servidor con
+  <code>iniciar.ps1</code>.</p>
+
+<h2>Mantenimiento</h2>
+<table>
+  <tr><th>Necesito…</th><th>Cómo</th></tr>
+  <tr><td><b>Actualizar</b> a una versión nueva del código</td>
+    <td>Reemplaza los archivos del proyecto (descomprime el ZIP nuevo encima) y vuelve a correr
+      <code>Instalar.bat</code> como administrador. Conserva la base y el <code>.env</code>.</td></tr>
+  <tr><td><b>Cambiar el puerto</b></td>
+    <td>Reinstala con <code>.\instalar.ps1 -Puerto 8080</code>; el favorito sería <code>localhost:8080</code>.</td></tr>
+  <tr><td><b>Activar facturación real</b> (no demo)</td>
+    <td>Edita <code>C:\Ligerito\.env</code>: pon <code>FACTURACION_MODO=facturama</code> y las
+      credenciales de Facturama. Ver <code>docs/Guia-Facturacion.md</code>. Por defecto va en
+      <code>demo</code> (timbres de prueba, sin validez fiscal).</td></tr>
+  <tr><td><b>Ver errores del servidor</b></td>
+    <td>Carpeta <code>C:\Ligerito\deploy\windows\logs\</code>.</td></tr>
+</table>
 
 <h2>Solución de problemas</h2>
 <table>
   <tr><th>Síntoma</th><th>Causa / arreglo</th></tr>
   <tr>
-    <td><code>Unexpected token</code> al correr el <code>.ps1</code></td>
-    <td>Versión vieja sin el arreglo de codificación → usa la de <code>main</code> con el PR&nbsp;#39.</td>
+    <td>La app se queda en <code>/licencia</code></td>
+    <td>Falta <code>C:\Ligerito\deploy\windows\licencia.token</code>, o el token no empareja con
+      <code>keys.ts</code>. Re-emite en Linux (Fase 1), copia el token y corre dentro de
+      <code>C:\Ligerito</code>:
+      <pre><code>npm run lic:instalar -- --archivo deploy\windows\licencia.token</code></pre></td>
   </tr>
   <tr>
-    <td><code>password authentication failed for user postgres</code></td>
-    <td>La contraseña de <code>-PgSuperPassword</code> no es la real de tu PostgreSQL.</td>
+    <td><code>password authentication failed for user "postgres"</code></td>
+    <td>La contraseña de <code>-PgSuperPassword</code> no es la real de tu PostgreSQL. Vuelve a correr
+      el instalador con la correcta.</td>
   </tr>
   <tr>
     <td><code>P1001 Can't reach database server</code></td>
-    <td>El script ya reintenta. Si persiste: confirma el servicio <code>postgresql*</code> corriendo y el puerto <code>5432</code>.</td>
+    <td>El instalador ya espera y reintenta 3 veces. Si persiste: abre <i>Servicios</i> de Windows,
+      confirma que el servicio <code>postgresql*</code> esté <b>en ejecución</b> y que escuche en el
+      puerto <code>5432</code>; luego reintenta.</td>
   </tr>
   <tr>
-    <td>La app se queda en <code>/licencia</code></td>
-    <td>Falta <code>deploy\windows\licencia.token</code> o el token no empareja con <code>keys.ts</code>.
-      Re-emite en Linux (Fase&nbsp;1) y corre:
-      <code>npm run lic:instalar -- --archivo deploy\windows\licencia.token</code></td>
+    <td><code>Unexpected token</code> al correr un <code>.ps1</code></td>
+    <td>Es una versión vieja de los scripts (problema de codificación). Usa el ZIP exportado de
+      <code>main</code> actual, que ya trae los scripts corregidos (UTF-8 con BOM).</td>
   </tr>
   <tr>
-    <td>Quieres facturación real (no demo)</td>
-    <td>Edita <code>.env</code>: <code>FACTURACION_MODO=facturama</code> + credenciales Facturama
-      (ver <code>docs/Guia-Facturacion.md</code>). Por defecto va en <code>demo</code>.</td>
+    <td><code>winget</code> no existe</td>
+    <td>Instala a mano <b>Node 20+</b> (nodejs.org) y <b>PostgreSQL 16+</b> (postgresql.org), y vuelve
+      a correr <code>Instalar.bat</code>.</td>
+  </tr>
+  <tr>
+    <td>No abre la página / <code>localhost</code> no responde</td>
+    <td>Revisa <code>deploy\windows\logs\</code>, confirma el servicio de PostgreSQL corriendo, y
+      vuelve a correr <code>iniciar.ps1</code>.</td>
   </tr>
 </table>
 
 <div class="callout ok">
   <b>Credenciales de fábrica (cámbialas)</b>
   Admin inicial: <span class="cred">admin@posvet.local</span> / <span class="cred">admin12345</span>.
-  Base de datos local: usuario <code>posvet</code> / base <code>posvet</code> en <code>127.0.0.1:5432</code>.
+  Base de datos local: usuario <code>posvet</code> / base <code>posvet</code> en
+  <code>127.0.0.1:5432</code>. La clave de sesión (<code>AUTH_SECRET</code>) se genera única en cada
+  instalación.
 </div>
 
 <footer>
-  Ligerito — POS general multi-giro · Instructivo de despliegue en una PC Windows · Generado 2026-06-09
+  Ligerito — POS general multi-giro · Instructivo de instalación en una PC Windows · Actualizado 2026-06-10
 </footer>
 
 </div>
