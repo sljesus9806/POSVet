@@ -48,6 +48,9 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
 const fmt = (n: number) =>
   new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n);
 
+// Billetes mexicanos para los botones de cobro rápido en efectivo.
+const DENOMINACIONES = [50, 100, 200, 500, 1000];
+
 function precioDeProducto(p: ProductoVendible, tipo: TipoPrecio): number {
   return p.precios[tipo] ?? p.precios.PUBLICO ?? 0;
 }
@@ -88,6 +91,8 @@ export function POSScreen({
   const [pagoTarjeta, setPagoTarjeta] = useState<string>("0");
   const [refTarjeta, setRefTarjeta] = useState("");
   const [pagoCredito, setPagoCredito] = useState<string>("0");
+  // false = el efectivo trae el "exacto" precargado; el 1er toque de denominación lo reemplaza.
+  const [efectivoEditado, setEfectivoEditado] = useState(false);
 
   const refBusquedaProducto = useRef<HTMLInputElement | null>(null);
   const refBusquedaCliente = useRef<HTMLInputElement | null>(null);
@@ -262,11 +267,35 @@ export function POSScreen({
     }
     setError(null);
     setPagoEfectivo(String(calculos.total));
+    setEfectivoEditado(false);
     setPagoTarjeta("0");
     setRefTarjeta("");
     setPagoCredito("0");
     setMostrarCobro(true);
     setTimeout(() => refPagoEfectivo.current?.select(), 0);
+  }
+
+  // Denominaciones rápidas de efectivo. El primer toque (cuando el efectivo aún
+  // trae el "exacto" precargado) reemplaza ese monto; los siguientes suman, así
+  // el cajero teclea "lo que me dio el cliente" (un 200 + un 100, etc.).
+  function tapDenominacion(monto: number) {
+    setPagoEfectivo((prev) => String(r2((efectivoEditado ? Number(prev) || 0 : 0) + monto)));
+    setEfectivoEditado(true);
+    refPagoEfectivo.current?.focus();
+  }
+  function efectivoExacto() {
+    setPagoEfectivo(String(calculos.total));
+    setEfectivoEditado(false);
+  }
+  function limpiarEfectivo() {
+    setPagoEfectivo("0");
+    setEfectivoEditado(true);
+    refPagoEfectivo.current?.focus();
+  }
+  // Pago dividido: pone en tarjeta lo que falte para cubrir el total.
+  function completarConTarjeta() {
+    const falta = r2(Math.max(0, calculos.total - (Number(pagoEfectivo) || 0) - (Number(pagoCredito) || 0)));
+    setPagoTarjeta(String(falta));
   }
 
   function cobrar() {
@@ -657,7 +686,16 @@ export function POSScreen({
       {/* ----------- Modal de cobro ----------- */}
       {mostrarCobro && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-card border rounded-lg shadow-lg w-full max-w-md p-5 space-y-4">
+          <div
+            className="bg-card border rounded-lg shadow-lg w-full max-w-md p-5 space-y-4"
+            onKeyDown={(e) => {
+              // Enter cobra (salvo que el foco esté en un botón, para no anular su clic).
+              if (e.key !== "Enter") return;
+              if ((e.target as HTMLElement).tagName.toLowerCase() === "button") return;
+              e.preventDefault();
+              if (!pendingSave && pagado + 0.001 >= calculos.total) cobrar();
+            }}
+          >
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-lg">Cobrar</h3>
               <button
@@ -685,14 +723,62 @@ export function POSScreen({
                   step="0.01"
                   min="0"
                   value={pagoEfectivo}
-                  onChange={(e) => setPagoEfectivo(e.target.value)}
+                  onChange={(e) => {
+                    setPagoEfectivo(e.target.value);
+                    setEfectivoEditado(true);
+                  }}
                   className="text-lg tabular-nums"
                 />
+                {/* Cobro rápido: billetes + exacto + limpiar */}
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="h-8 px-2.5"
+                    onClick={efectivoExacto}
+                  >
+                    Exacto
+                  </Button>
+                  {DENOMINACIONES.map((d) => (
+                    <Button
+                      key={d}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 px-2.5 tabular-nums"
+                      onClick={() => tapDenominacion(d)}
+                    >
+                      ${d}
+                    </Button>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-2.5 text-muted-foreground"
+                    onClick={limpiarEfectivo}
+                    title="Poner el efectivo en 0"
+                  >
+                    <X className="size-3.5" />
+                  </Button>
+                </div>
               </div>
               <div>
-                <label className="text-sm font-medium flex items-center gap-2">
-                  <CreditCard className="size-4" /> Tarjeta
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <CreditCard className="size-4" /> Tarjeta
+                  </label>
+                  {r2((Number(pagoEfectivo) || 0) + (Number(pagoCredito) || 0)) < calculos.total - 0.005 && (
+                    <button
+                      type="button"
+                      onClick={completarConTarjeta}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Completar con tarjeta
+                    </button>
+                  )}
+                </div>
                 <Input
                   type="number"
                   step="0.01"
@@ -744,10 +830,21 @@ export function POSScreen({
                 <span className="text-muted-foreground">Recibido</span>
                 <span className="tabular-nums">{fmt(pagado)}</span>
               </div>
-              <div className="flex justify-between font-semibold">
-                <span>Cambio</span>
-                <span className="tabular-nums">{fmt(cambio)}</span>
-              </div>
+              {pagado + 0.005 < calculos.total ? (
+                <div className="flex justify-between items-baseline font-semibold text-destructive">
+                  <span>Falta</span>
+                  <span className="text-xl tabular-nums">{fmt(r2(calculos.total - pagado))}</span>
+                </div>
+              ) : (
+                <div className="flex justify-between items-baseline font-semibold">
+                  <span>Cambio</span>
+                  <span
+                    className={`text-2xl tabular-nums ${cambio > 0 ? "text-emerald-600 dark:text-emerald-400" : ""}`}
+                  >
+                    {fmt(cambio)}
+                  </span>
+                </div>
+              )}
             </div>
 
             {error && (
@@ -766,7 +863,7 @@ export function POSScreen({
                 disabled={pendingSave || pagado + 0.001 < calculos.total}
               >
                 <Printer className="size-4" />
-                {pendingSave ? "Guardando…" : "Cobrar (F8)"}
+                {pendingSave ? "Guardando…" : "Cobrar (Enter)"}
               </Button>
             </div>
           </div>
