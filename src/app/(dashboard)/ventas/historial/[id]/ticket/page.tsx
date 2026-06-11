@@ -56,7 +56,7 @@ export default async function TicketPage({ params }: { params: Params }) {
           {v.clienteId && (
             <div className="flex justify-between">
               <span>Cliente:</span>
-              <span className="text-right">{v.clienteCodigo}</span>
+              <span className="text-right">{v.clienteNombre ?? v.clienteCodigo}</span>
             </div>
           )}
         </section>

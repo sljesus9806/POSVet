@@ -27,7 +27,9 @@ export default async function CajaDetallePage({ params }: { params: Params }) {
 
   const ventas = await ventasService.listarVentas({ cajaId: caja.id, limit: 200 });
   const efectivoVendido = caja.desglosePorForma.find((d) => d.forma === "EFECTIVO")?.total ?? 0;
-  const esperado = caja.fondoInicial + efectivoVendido;
+  // El cambio entregado sale del cajón (efectivo): se resta del esperado.
+  const cambioTotal = caja.cambioTotal;
+  const esperado = caja.fondoInicial + efectivoVendido - cambioTotal;
 
   return (
     <div className="space-y-6">
@@ -76,6 +78,12 @@ export default async function CajaDetallePage({ params }: { params: Params }) {
             </ul>
           )}
           <div className="border-t pt-2 text-sm space-y-1">
+            {cambioTotal > 0 && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Cambio entregado</span>
+                <span className="tabular-nums">− {fmt(cambioTotal)}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-muted-foreground">Efectivo esperado en caja</span>
               <span className="tabular-nums font-semibold">{fmt(esperado)}</span>

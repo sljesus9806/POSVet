@@ -74,11 +74,14 @@ export const ventasRepository = {
       where: { cajaId, estado: "COMPLETADA" },
       select: {
         total: true,
+        cambio: true,
         pagos: { select: { forma: true, monto: true } },
       },
     });
 
     const totalVendido = ventas.reduce((acc, v) => acc + Number(v.total), 0);
+    // El cambio devuelto sale del cajón (siempre en efectivo): se acumula para restarlo del esperado.
+    const cambioTotal = ventas.reduce((acc, v) => acc + Number(v.cambio), 0);
     const desglose = new Map<string, number>();
     for (const v of ventas) {
       for (const p of v.pagos) {
@@ -88,6 +91,7 @@ export const ventasRepository = {
 
     return {
       totalVendido,
+      cambioTotal,
       totalVentas: ventas.length,
       desglose: Array.from(desglose.entries()).map(([forma, total]) => ({ forma: forma as never, total })),
     };

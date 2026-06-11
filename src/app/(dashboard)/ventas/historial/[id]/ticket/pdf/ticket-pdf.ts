@@ -56,7 +56,7 @@ export function generarTicketPdf(v: VentaDetalle, empresa: EmpresaTicket | null)
   row("Fecha:", v.fechaVenta.toLocaleString("es-MX"));
   row("Caja:", v.cajaFolio);
   row("Cajero:", v.usuarioNombre);
-  if (v.clienteId) row("Cliente:", v.clienteCodigo ?? "—");
+  if (v.clienteId) row("Cliente:", v.clienteNombre ?? v.clienteCodigo ?? "—");
   divider();
 
   for (const l of v.lineas) {

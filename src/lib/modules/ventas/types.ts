@@ -24,6 +24,7 @@ export type CajaDetalle = CajaListado & {
   observacionesCierre: string | null;
   totalVentas: number;
   desglosePorForma: Array<{ forma: FormaPago; total: number }>;
+  cambioTotal: number;
 };
 
 export type VentaLineaListado = {
