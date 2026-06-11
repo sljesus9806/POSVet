@@ -120,6 +120,11 @@ export function POSScreen({
   const [mostrarEnEspera, setMostrarEnEspera] = useState(false);
   const claveEspera = `pos-espera-${caja.id}`;
 
+  // Consulta de precio (F6): al elegir un producto muestra sus precios sin agregarlo.
+  const [modoConsulta, setModoConsulta] = useState(false);
+  // Última venta cobrada, para reimprimir su recibo sin buscarla en el historial.
+  const [ultimaVenta, setUltimaVenta] = useState<{ ventaId: string; folio: string } | null>(null);
+
   const refBusquedaProducto = useRef<HTMLInputElement | null>(null);
   const refBusquedaCliente = useRef<HTMLInputElement | null>(null);
   const refDescuentoGlobal = useRef<HTMLInputElement | null>(null);
@@ -206,8 +211,7 @@ export function POSScreen({
     if (!q || productos.length === 0) return;
     const exacto = productos.find((p) => p.codigoBarras === q || p.sku === q);
     if (exacto) {
-      agregarProducto(exacto);
-      setProductosQuery("");
+      seleccionarProducto(exacto);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productos]);
@@ -268,7 +272,13 @@ export function POSScreen({
   // Selección desde el dropdown de autocompletar: agrega y deja listo el
   // buscador para el siguiente producto (cierra la lista al limpiar la query).
   function seleccionarProducto(p: ProductoVendible) {
-    agregarProducto(p);
+    if (modoConsulta) {
+      toast(p.nombre, {
+        description: `Público ${fmt(p.precios.PUBLICO ?? 0)} · Mayoreo ${fmt(p.precios.MAYOREO ?? 0)} · Distribuidor ${fmt(p.precios.DISTRIBUIDOR ?? 0)} · Stock ${p.stockUbicacion} ${p.unidadMedida}`,
+      });
+    } else {
+      agregarProducto(p);
+    }
     setProductosQuery("");
     setTimeout(() => refBusquedaProducto.current?.focus(), 0);
   }
@@ -387,6 +397,19 @@ export function POSScreen({
     setPagoTarjeta(String(falta));
   }
 
+  // Descarga el recibo en PDF sin cambiar de pestaña (reusado por cobrar y reimprimir).
+  function descargarRecibo(ventaId: string, folio: string) {
+    const a = document.createElement("a");
+    a.href = `/ventas/historial/${ventaId}/ticket/pdf`;
+    a.download = `Recibo_${folio}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+  function reimprimirUltima() {
+    if (ultimaVenta) descargarRecibo(ultimaVenta.ventaId, ultimaVenta.folio);
+  }
+
   function cobrar() {
     const pagos: CrearVentaInput["pagos"] = [];
     const efectivo = Number(pagoEfectivo) || 0;
@@ -432,13 +455,9 @@ export function POSScreen({
         return;
       }
       setMostrarCobro(false);
+      setUltimaVenta({ ventaId: res.ventaId, folio: res.folio });
       // Descarga el recibo en PDF SIN cambiar de pestaña y avisa con un toast.
-      const a = document.createElement("a");
-      a.href = `/ventas/historial/${res.ventaId}/ticket/pdf`;
-      a.download = `Recibo_${res.folio}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      descargarRecibo(res.ventaId, res.folio);
       toast.success(`Venta ${res.folio} cobrada`, {
         description: "El recibo se generó y se descargó en PDF.",
       });
@@ -465,6 +484,11 @@ export function POSScreen({
         e.preventDefault();
         refDescuentoGlobal.current?.focus();
         refDescuentoGlobal.current?.select();
+      } else if (e.key === "F6") {
+        e.preventDefault();
+        setModoConsulta((v) => !v);
+        refBusquedaProducto.current?.focus();
+        refBusquedaProducto.current?.select();
       } else if (e.key === "F8") {
         e.preventDefault();
         if (mostrarCobro) cobrar();
@@ -487,6 +511,9 @@ export function POSScreen({
       } else if (!enInput && !mostrarCobro && e.key === "Delete") {
         e.preventDefault();
         if (lineaActivaUid) eliminarLinea(lineaActivaUid);
+      } else if (e.key === "Escape" && modoConsulta) {
+        e.preventDefault();
+        setModoConsulta(false);
       } else if (e.key === "Escape" && !enInput) {
         e.preventDefault();
         if (mostrarCobro) setMostrarCobro(false);
@@ -496,7 +523,7 @@ export function POSScreen({
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lineas, lineaActivaUid, mostrarCobro, clienteId, descuentoGlobal, observaciones, calculos.total, pagoEfectivo, pagoTarjeta, pagoCredito]);
+  }, [lineas, lineaActivaUid, mostrarCobro, modoConsulta, clienteId, descuentoGlobal, observaciones, calculos.total, pagoEfectivo, pagoTarjeta, pagoCredito]);
 
   // ----- Filtrado de clientes en client (lista pequeña) -----
   const clientesFiltrados = useMemo(() => {
@@ -517,6 +544,16 @@ export function POSScreen({
       {/* ----------- Panel izquierdo: catálogo ----------- */}
       <section className="space-y-3">
         <div className="bg-card rounded-lg border p-3 space-y-2">
+          {modoConsulta && (
+            <div className="flex items-center justify-between rounded-md bg-amber-100 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 px-2.5 py-1.5 text-xs">
+              <span className="flex items-center gap-1.5 font-medium">
+                <Tag className="size-3.5" /> Consulta de precio — no se agrega al carrito
+              </span>
+              <button type="button" onClick={() => setModoConsulta(false)} className="hover:underline">
+                Salir (Esc)
+              </button>
+            </div>
+          )}
           <div className="relative">
             <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -577,6 +614,15 @@ export function POSScreen({
 
         {/* Ayuda (el panel grande de productos se reemplazó por el autocompletar de arriba) */}
         <div className="bg-card rounded-lg border p-4 text-sm text-muted-foreground space-y-2">
+          {ultimaVenta && (
+            <button
+              type="button"
+              onClick={reimprimirUltima}
+              className="flex items-center gap-2 text-xs text-primary hover:underline"
+            >
+              <Printer className="size-3.5" /> Reimprimir último ticket ({ultimaVenta.folio})
+            </button>
+          )}
           <p>
             Escribe en el buscador para ver productos que coincidan en{" "}
             <span className="font-medium text-foreground">nombre</span>,{" "}
