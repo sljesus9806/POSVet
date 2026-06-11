@@ -40,7 +40,8 @@ type LineaCarrito = {
   unidadMedida: string;
   cantidad: number;
   precioUnitario: number; // con IVA
-  descuento: number;
+  descuento: number; // monto en $ o % según descModo
+  descModo: "monto" | "pct";
   ivaTasa: number;
 };
 
@@ -52,6 +53,7 @@ type VentaEnEspera = {
   clienteId: string | null;
   lineas: LineaCarrito[];
   descuentoGlobal: number;
+  descGlobalModo?: "monto" | "pct";
   observaciones: string;
 };
 
@@ -64,6 +66,13 @@ const DENOMINACIONES = [50, 100, 200, 500, 1000];
 
 function precioDeProducto(p: ProductoVendible, tipo: TipoPrecio): number {
   return p.precios[tipo] ?? p.precios.PUBLICO ?? 0;
+}
+
+// Descuento efectivo de una línea en pesos (interpreta monto $ o %, limitado al bruto).
+function descEfectivoLinea(l: LineaCarrito): number {
+  const bruto = r2(l.precioUnitario * l.cantidad);
+  const raw = l.descModo === "pct" ? r2(bruto * (l.descuento / 100)) : l.descuento;
+  return r2(Math.min(Math.max(0, raw), bruto));
 }
 
 export function POSScreen({
@@ -94,6 +103,7 @@ export function POSScreen({
   const [lineaActivaUid, setLineaActivaUid] = useState<string | null>(null);
 
   const [descuentoGlobal, setDescuentoGlobal] = useState<number>(0);
+  const [descGlobalModo, setDescGlobalModo] = useState<"monto" | "pct">("monto");
   const [observaciones, setObservaciones] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -122,7 +132,7 @@ export function POSScreen({
     let descuentoLineas = 0;
     for (const l of lineas) {
       const bruto = r2(l.precioUnitario * l.cantidad);
-      const desc = r2(Math.min(l.descuento, bruto));
+      const desc = descEfectivoLinea(l);
       const totalLinea = r2(bruto - desc);
       const sub = r2(totalLinea / (1 + l.ivaTasa));
       const ivaImp = r2(totalLinea - sub);
@@ -134,10 +144,12 @@ export function POSScreen({
     iva = r2(iva);
     descuentoLineas = r2(descuentoLineas);
     const totalAntesDesc = r2(subtotal + iva);
-    const descAplicado = r2(Math.min(descuentoGlobal, totalAntesDesc));
+    const descGlobalBruto =
+      descGlobalModo === "pct" ? r2(totalAntesDesc * (descuentoGlobal / 100)) : descuentoGlobal;
+    const descAplicado = r2(Math.min(Math.max(0, descGlobalBruto), totalAntesDesc));
     const total = r2(totalAntesDesc - descAplicado);
     return { subtotal, iva, descuentoLineas, descuentoAplicado: descAplicado, total };
-  }, [lineas, descuentoGlobal]);
+  }, [lineas, descuentoGlobal, descGlobalModo]);
 
   const pagado = r2(
     (Number(pagoEfectivo) || 0) + (Number(pagoTarjeta) || 0) + (Number(pagoCredito) || 0),
@@ -246,6 +258,7 @@ export function POSScreen({
           cantidad: 1,
           precioUnitario: precio,
           descuento: 0,
+          descModo: "monto",
           ivaTasa: p.ivaTasa,
         },
       ];
@@ -269,10 +282,25 @@ export function POSScreen({
     setLineaActivaUid((curr) => (curr === uid ? null : curr));
   }
 
+  // Navegación del carrito por teclado (flechas mueven la línea activa, +/− la cantidad).
+  function moverLineaActiva(dir: 1 | -1) {
+    if (lineas.length === 0) return;
+    const idx = lineas.findIndex((l) => l.uid === lineaActivaUid);
+    const next = idx < 0 ? (dir === 1 ? 0 : lineas.length - 1) : Math.min(lineas.length - 1, Math.max(0, idx + dir));
+    setLineaActivaUid(lineas[next].uid);
+  }
+  function nudgeCantidad(delta: number) {
+    if (!lineaActivaUid) return;
+    setLineas((prev) =>
+      prev.map((l) => (l.uid === lineaActivaUid ? { ...l, cantidad: Math.max(1, r2(l.cantidad + delta)) } : l)),
+    );
+  }
+
   function limpiarCarrito() {
     setLineas([]);
     setLineaActivaUid(null);
     setDescuentoGlobal(0);
+    setDescGlobalModo("monto");
     setObservaciones("");
     setClienteId(null);
     setClienteQuery("");
@@ -286,7 +314,7 @@ export function POSScreen({
       ? cliente.nombre
       : `Ticket ${new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`;
     setEnEspera((prev) => [
-      { id: `esp-${Date.now()}`, etiqueta, creadoEn: Date.now(), clienteId, lineas, descuentoGlobal, observaciones },
+      { id: `esp-${Date.now()}`, etiqueta, creadoEn: Date.now(), clienteId, lineas, descuentoGlobal, descGlobalModo, observaciones },
       ...prev,
     ]);
     limpiarCarrito();
@@ -297,6 +325,7 @@ export function POSScreen({
     setLineas(v.lineas);
     setClienteId(v.clienteId);
     setDescuentoGlobal(v.descuentoGlobal);
+    setDescGlobalModo(v.descGlobalModo ?? "monto");
     setObservaciones(v.observaciones);
     setLineaActivaUid(v.lineas[0]?.uid ?? null);
     setEnEspera((prev) => prev.filter((x) => x.id !== v.id));
@@ -385,12 +414,12 @@ export function POSScreen({
     const payload: CrearVentaInput = {
       cajaId: caja.id,
       clienteId: clienteId ?? undefined,
-      descuentoGlobal: r2(descuentoGlobal),
+      descuentoGlobal: calculos.descuentoAplicado,
       observaciones: observaciones || undefined,
       lineas: lineas.map((l) => ({
         productoId: l.productoId,
         cantidad: l.cantidad,
-        descuento: r2(l.descuento),
+        descuento: descEfectivoLinea(l),
       })),
       pagos,
     };
@@ -446,6 +475,18 @@ export function POSScreen({
       } else if (e.key === "F7") {
         e.preventDefault();
         if (!mostrarCobro) suspenderVenta();
+      } else if (!enInput && !mostrarCobro && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+        e.preventDefault();
+        moverLineaActiva(e.key === "ArrowDown" ? 1 : -1);
+      } else if (!enInput && !mostrarCobro && (e.key === "+" || e.key === "=")) {
+        e.preventDefault();
+        nudgeCantidad(1);
+      } else if (!enInput && !mostrarCobro && e.key === "-") {
+        e.preventDefault();
+        nudgeCantidad(-1);
+      } else if (!enInput && !mostrarCobro && e.key === "Delete") {
+        e.preventDefault();
+        if (lineaActivaUid) eliminarLinea(lineaActivaUid);
       } else if (e.key === "Escape" && !enInput) {
         e.preventDefault();
         if (mostrarCobro) setMostrarCobro(false);
@@ -691,8 +732,7 @@ export function POSScreen({
           ) : (
             <div className="max-h-[340px] overflow-y-auto divide-y">
               {lineas.map((l) => {
-                const bruto = r2(l.precioUnitario * l.cantidad);
-                const totalLinea = r2(bruto - Math.min(l.descuento, bruto));
+                const totalLinea = r2(r2(l.precioUnitario * l.cantidad) - descEfectivoLinea(l));
                 const activa = l.uid === lineaActivaUid;
                 return (
                   <div
@@ -717,7 +757,7 @@ export function POSScreen({
                         <Trash2 className="size-4" />
                       </button>
                     </div>
-                    <div className="mt-2 grid grid-cols-[80px_1fr_100px_110px] gap-2 items-center">
+                    <div className="mt-2 grid grid-cols-[64px_1fr_116px_84px] gap-2 items-center">
                       <Input
                         type="number"
                         step="0.001"
@@ -729,22 +769,36 @@ export function POSScreen({
                         onClick={(e) => e.stopPropagation()}
                         className="h-8 text-sm"
                       />
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs text-muted-foreground truncate">
                         × {fmt(l.precioUnitario)} {l.unidadMedida}
                       </span>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="Desc."
-                        value={l.descuento || ""}
-                        onChange={(e) =>
-                          actualizarLinea(l.uid, { descuento: Math.max(0, Number(e.target.value) || 0) })
-                        }
-                        onClick={(e) => e.stopPropagation()}
-                        className="h-8 text-sm"
-                        title="Descuento de la línea en moneda"
-                      />
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            actualizarLinea(l.uid, { descModo: l.descModo === "pct" ? "monto" : "pct" });
+                          }}
+                          className="h-8 w-6 shrink-0 rounded border text-xs font-medium text-muted-foreground hover:bg-accent"
+                          title="Cambiar descuento $ / %"
+                        >
+                          {l.descModo === "pct" ? "%" : "$"}
+                        </button>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="Desc."
+                          value={l.descuento || ""}
+                          onChange={(e) => {
+                            const v = Math.max(0, Number(e.target.value) || 0);
+                            actualizarLinea(l.uid, { descuento: l.descModo === "pct" ? Math.min(100, v) : v });
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="h-8 text-sm"
+                          title="Descuento de la línea"
+                        />
+                      </div>
                       <div className="text-right font-semibold tabular-nums">{fmt(totalLinea)}</div>
                     </div>
                   </div>
@@ -763,20 +817,37 @@ export function POSScreen({
               <span className="text-muted-foreground">IVA</span>
               <span className="tabular-nums">{fmt(calculos.iva)}</span>
             </div>
-            <div className="flex justify-between items-center">
-              <label className="text-muted-foreground flex items-center gap-1">
-                Descuento global (F4)
-              </label>
-              <Input
-                ref={refDescuentoGlobal}
-                type="number"
-                step="0.01"
-                min="0"
-                value={descuentoGlobal || ""}
-                onChange={(e) => setDescuentoGlobal(Math.max(0, Number(e.target.value) || 0))}
-                className="h-7 w-24 text-right tabular-nums"
-              />
+            <div className="flex justify-between items-center gap-2">
+              <span className="text-muted-foreground">Descuento global (F4)</span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setDescGlobalModo((m) => (m === "pct" ? "monto" : "pct"))}
+                  className="h-7 w-7 shrink-0 rounded border text-xs font-medium text-muted-foreground hover:bg-accent"
+                  title="Cambiar descuento $ / %"
+                >
+                  {descGlobalModo === "pct" ? "%" : "$"}
+                </button>
+                <Input
+                  ref={refDescuentoGlobal}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={descuentoGlobal || ""}
+                  onChange={(e) => {
+                    const v = Math.max(0, Number(e.target.value) || 0);
+                    setDescuentoGlobal(descGlobalModo === "pct" ? Math.min(100, v) : v);
+                  }}
+                  className="h-7 w-20 text-right tabular-nums"
+                />
+              </div>
             </div>
+            {descGlobalModo === "pct" && calculos.descuentoAplicado > 0 && (
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>{descuentoGlobal}% de descuento</span>
+                <span className="tabular-nums">− {fmt(calculos.descuentoAplicado)}</span>
+              </div>
+            )}
             <div className="flex justify-between items-center pt-2 border-t mt-1">
               <span className="font-semibold">Total</span>
               <span className="text-xl font-bold tabular-nums">{fmt(calculos.total)}</span>
