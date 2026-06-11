@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Search, Trash2, X, Banknote, CreditCard, Printer, Wallet } from "lucide-react";
+import { Plus, Search, Trash2, X, Banknote, CreditCard, Printer, Wallet, Pause, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -42,6 +42,17 @@ type LineaCarrito = {
   precioUnitario: number; // con IVA
   descuento: number;
   ivaTasa: number;
+};
+
+// Una venta suspendida (carrito completo guardado para retomar luego).
+type VentaEnEspera = {
+  id: string;
+  etiqueta: string;
+  creadoEn: number;
+  clienteId: string | null;
+  lineas: LineaCarrito[];
+  descuentoGlobal: number;
+  observaciones: string;
 };
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -93,6 +104,11 @@ export function POSScreen({
   const [pagoCredito, setPagoCredito] = useState<string>("0");
   // false = el efectivo trae el "exacto" precargado; el 1er toque de denominación lo reemplaza.
   const [efectivoEditado, setEfectivoEditado] = useState(false);
+
+  // Ventas en espera (suspender/recuperar), persistidas por caja en el navegador.
+  const [enEspera, setEnEspera] = useState<VentaEnEspera[]>([]);
+  const [mostrarEnEspera, setMostrarEnEspera] = useState(false);
+  const claveEspera = `pos-espera-${caja.id}`;
 
   const refBusquedaProducto = useRef<HTMLInputElement | null>(null);
   const refBusquedaCliente = useRef<HTMLInputElement | null>(null);
@@ -184,6 +200,24 @@ export function POSScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productos]);
 
+  // Cargar/guardar las ventas en espera en localStorage (sobreviven recargas).
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(claveEspera);
+      if (raw) setEnEspera(JSON.parse(raw) as VentaEnEspera[]);
+    } catch {
+      /* storage no disponible o corrupto: se ignora */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem(claveEspera, JSON.stringify(enEspera));
+    } catch {
+      /* sin storage: no pasa nada */
+    }
+  }, [enEspera, claveEspera]);
+
   // ----- Carrito -----
   function agregarProducto(p: ProductoVendible) {
     const precio = precioDeProducto(p, tipoPrecio);
@@ -245,6 +279,34 @@ export function POSScreen({
     setError(null);
   }
 
+  // ----- Ventas en espera (suspender / recuperar) -----
+  function suspenderVenta() {
+    if (lineas.length === 0) return;
+    const etiqueta = cliente
+      ? cliente.nombre
+      : `Ticket ${new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`;
+    setEnEspera((prev) => [
+      { id: `esp-${Date.now()}`, etiqueta, creadoEn: Date.now(), clienteId, lineas, descuentoGlobal, observaciones },
+      ...prev,
+    ]);
+    limpiarCarrito();
+    toast.success("Venta puesta en espera");
+  }
+  function recuperarVenta(v: VentaEnEspera) {
+    if (lineas.length > 0 && !confirm("El carrito actual se reemplazará. ¿Continuar?")) return;
+    setLineas(v.lineas);
+    setClienteId(v.clienteId);
+    setDescuentoGlobal(v.descuentoGlobal);
+    setObservaciones(v.observaciones);
+    setLineaActivaUid(v.lineas[0]?.uid ?? null);
+    setEnEspera((prev) => prev.filter((x) => x.id !== v.id));
+    setMostrarEnEspera(false);
+    setError(null);
+  }
+  function eliminarEnEspera(id: string) {
+    setEnEspera((prev) => prev.filter((x) => x.id !== id));
+  }
+
   // ----- Cambio de tipo de precio al cambiar cliente: recalcular precios unitarios -----
   useEffect(() => {
     setLineas((prev) =>
@@ -254,8 +316,6 @@ export function POSScreen({
         return { ...l, precioUnitario: precioDeProducto(p, tipoPrecio) };
       }),
     );
-    // Reposicionamos descuento global a 0 al cambiar de cliente
-    setDescuentoGlobal(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tipoPrecio]);
 
@@ -383,6 +443,9 @@ export function POSScreen({
       } else if (e.key === "F9") {
         e.preventDefault();
         if (lineaActivaUid) eliminarLinea(lineaActivaUid);
+      } else if (e.key === "F7") {
+        e.preventDefault();
+        if (!mostrarCobro) suspenderVenta();
       } else if (e.key === "Escape" && !enInput) {
         e.preventDefault();
         if (mostrarCobro) setMostrarCobro(false);
@@ -392,7 +455,7 @@ export function POSScreen({
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lineaActivaUid, lineas.length, mostrarCobro, calculos.total, pagoEfectivo, pagoTarjeta, pagoCredito]);
+  }, [lineas, lineaActivaUid, mostrarCobro, clienteId, descuentoGlobal, observaciones, calculos.total, pagoEfectivo, pagoTarjeta, pagoCredito]);
 
   // ----- Filtrado de clientes en client (lista pequeña) -----
   const clientesFiltrados = useMemo(() => {
@@ -485,14 +548,60 @@ export function POSScreen({
             Atajos: <span className="font-mono">F2</span> buscar ·{" "}
             <span className="font-mono">F3</span> cliente ·{" "}
             <span className="font-mono">F4</span> descuento ·{" "}
+            <span className="font-mono">F6</span> consulta precio ·{" "}
+            <span className="font-mono">F7</span> suspender ·{" "}
             <span className="font-mono">F8</span> cobrar ·{" "}
-            <span className="font-mono">F9</span> quitar línea.
+            <span className="font-mono">F9</span> quitar línea ·{" "}
+            <span className="font-mono">↑↓</span> línea ·{" "}
+            <span className="font-mono">+/−</span> cantidad.
           </p>
         </div>
       </section>
 
       {/* ----------- Panel derecho: carrito + cliente + totales ----------- */}
       <section className="space-y-3">
+        {/* Ventas en espera */}
+        {enEspera.length > 0 && (
+          <div className="bg-card rounded-lg border">
+            <button
+              type="button"
+              onClick={() => setMostrarEnEspera((v) => !v)}
+              className="w-full px-3 py-2 flex items-center justify-between text-sm font-medium hover:bg-accent/50"
+            >
+              <span className="flex items-center gap-2">
+                <Pause className="size-4" /> En espera ({enEspera.length})
+              </span>
+              <span className="text-xs text-muted-foreground">{mostrarEnEspera ? "Ocultar" : "Ver"}</span>
+            </button>
+            {mostrarEnEspera && (
+              <ul className="border-t divide-y max-h-48 overflow-y-auto">
+                {enEspera.map((v) => (
+                  <li key={v.id} className="flex items-center gap-2 px-3 py-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm truncate">{v.etiqueta}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {v.lineas.length} art. ·{" "}
+                        {new Date(v.creadoEn).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}
+                      </div>
+                    </div>
+                    <Button type="button" size="sm" variant="outline" className="h-7" onClick={() => recuperarVenta(v)}>
+                      Recuperar
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={() => eliminarEnEspera(v.id)}
+                      className="text-muted-foreground hover:text-destructive"
+                      title="Descartar"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
         {/* Cliente */}
         <div className="bg-card rounded-lg border p-3 space-y-2">
           <div className="flex items-center justify-between">
@@ -556,13 +665,22 @@ export function POSScreen({
           <div className="px-3 py-2 border-b flex items-center justify-between bg-muted/30">
             <span className="text-sm font-medium">Carrito ({lineas.length})</span>
             {lineas.length > 0 && (
-              <button
-                type="button"
-                onClick={limpiarCarrito}
-                className="text-xs text-muted-foreground hover:text-destructive flex items-center gap-1"
-              >
-                <X className="size-3" /> Limpiar (ESC)
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={suspenderVenta}
+                  className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                >
+                  <Pause className="size-3" /> Suspender (F7)
+                </button>
+                <button
+                  type="button"
+                  onClick={limpiarCarrito}
+                  className="text-xs text-muted-foreground hover:text-destructive flex items-center gap-1"
+                >
+                  <X className="size-3" /> Limpiar (ESC)
+                </button>
+              </div>
             )}
           </div>
 
