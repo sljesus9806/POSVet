@@ -143,7 +143,9 @@ export async function run(): Promise<void> {
   caso("VEN-11", "cerrarCaja con conteo de efectivo → esperado vs contado, diferencia, CERRADA");
   const detCaja = await ventasService.obtenerCaja(caja.id);
   const efectivo = detCaja?.desglosePorForma.find((d) => d.forma === "EFECTIVO")?.total ?? 0;
-  const esperado = r2(1000 + efectivo);
+  // El cambio devuelto sale del cajón: el esperado debe restarlo (fix Bug corte de caja).
+  const cambioTotal = detCaja?.cambioTotal ?? 0;
+  const esperado = r2(1000 + efectivo - cambioTotal);
   const cerrada = await ventasService.cerrarCaja({ cajaId: caja.id, montoContadoEfectivo: esperado }, { usuarioId });
   eq(cerrada.estado, "CERRADA", "caja cerrada");
   eq(cerrada.montoEsperadoEfectivo ?? -1, esperado, "monto esperado calculado");

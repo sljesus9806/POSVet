@@ -90,9 +90,8 @@ export default async function VentaDetallePage({ params }: { params: Params }) {
           <h3 className="font-semibold mb-2">Cliente</h3>
           {v.clienteId ? (
             <>
-              <div className="font-medium">
-                {v.clienteCodigo} · {v.clienteId ? null : null}
-              </div>
+              <div className="font-medium">{v.clienteNombre ?? "Cliente"}</div>
+              <div className="text-xs text-muted-foreground font-mono">{v.clienteCodigo}</div>
               <Link
                 href={`/clientes/${v.clienteId}`}
                 className="font-medium hover:underline"

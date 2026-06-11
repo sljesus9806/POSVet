@@ -230,6 +230,7 @@ export const ventasService = {
       observacionesCierre: c.observacionesCierre,
       totalVentas: resumen.totalVentas,
       desglosePorForma: resumen.desglose,
+      cambioTotal: resumen.cambioTotal,
     };
   },
 
@@ -283,7 +284,8 @@ export const ventasService = {
 
     const resumen = await ventasRepository.resumenCaja(data.cajaId);
     const efectivoVendido = resumen.desglose.find((d) => d.forma === "EFECTIVO")?.total ?? 0;
-    const esperado = r2(toNumber(caja.fondoInicial) + efectivoVendido);
+    // El cambio entregado sale del cajón (siempre efectivo), por eso se resta del esperado.
+    const esperado = r2(toNumber(caja.fondoInicial) + efectivoVendido - resumen.cambioTotal);
     const contado = r2(data.montoContadoEfectivo);
     const diferencia = r2(contado - esperado);
 
