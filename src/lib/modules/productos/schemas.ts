@@ -17,11 +17,14 @@ export const precioInputSchema = z.object({
 });
 
 export const crearProductoSchema = z.object({
+  // SKU opcional: si llega vacío, el service genera uno (P-XXXXXX).
   sku: z
     .string()
     .trim()
     .transform((v) => v.toUpperCase())
-    .pipe(z.string().regex(skuRegex, "SKU debe ser A-Z, 0-9 o guión (2-40 chars)")),
+    .pipe(z.string().regex(skuRegex, "SKU debe ser A-Z, 0-9 o guión (2-40 chars)"))
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
   codigoBarras: z
     .string()
     .trim()
@@ -29,7 +32,7 @@ export const crearProductoSchema = z.object({
     .max(64)
     .optional()
     .or(z.literal("").transform(() => undefined)),
-  nombre: z.string().trim().min(2).max(200),
+  nombre: z.string().trim().min(1, "Escribe un nombre").max(200),
   descripcion: z
     .string()
     .trim()
@@ -38,8 +41,8 @@ export const crearProductoSchema = z.object({
     .or(z.literal("").transform(() => undefined)),
   marca: z.string().trim().max(100).optional().or(z.literal("").transform(() => undefined)),
   categoriaId: z.string().cuid().optional().or(z.literal("").transform(() => undefined)),
-  unidadMedida: z.string().trim().min(1).max(10),
-  tipo: tipoProductoSchema,
+  unidadMedida: z.string().trim().min(1).max(10).default("PZA"),
+  tipo: tipoProductoSchema.default("ACCESORIO"),
   especie: z.string().trim().max(50).optional().or(z.literal("").transform(() => undefined)),
   requiereReceta: z.boolean().default(false),
   sustanciaControlada: z.boolean().default(false),

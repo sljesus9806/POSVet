@@ -49,9 +49,10 @@ function Err({ msgs }: { msgs?: string[] }) {
 type Props = {
   categorias: CategoriaListado[];
   producto?: ProductoDetalle;
+  ubicaciones?: { id: string; nombre: string }[];
 };
 
-export function ProductoForm({ categorias, producto }: Props) {
+export function ProductoForm({ categorias, producto, ubicaciones = [] }: Props) {
   const isEdit = !!producto;
   const action = isEdit ? actualizarProductoAction : crearProductoAction;
   const [state, formAction] = useActionState(action, initial);
@@ -114,8 +115,13 @@ export function ProductoForm({ categorias, producto }: Props) {
         <h3 className="font-semibold">Identificación</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="sku">SKU</Label>
-            <Input id="sku" name="sku" defaultValue={producto?.sku} required placeholder="ABC-001" />
+            <Label htmlFor="sku">Código interno (SKU)</Label>
+            <Input
+              id="sku"
+              name="sku"
+              defaultValue={producto?.sku}
+              placeholder={isEdit ? "" : "Se genera solo si lo dejas vacío"}
+            />
             <Err msgs={state.fieldErrors?.sku} />
           </div>
           <div>
@@ -306,6 +312,45 @@ export function ProductoForm({ categorias, producto }: Props) {
           <Err msgs={state.fieldErrors.precios as unknown as string[]} />
         )}
       </section>
+
+      {!isEdit && ubicaciones.length > 0 && (
+        <section className="rounded-lg border bg-card p-5 space-y-4">
+          <h3 className="font-semibold">Stock inicial</h3>
+          <p className="text-xs text-muted-foreground">
+            Opcional. Cuántas existencias tienes ahora mismo. Después puedes agregar
+            o ajustar desde la pantalla de productos.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="stockInicial">Cantidad</Label>
+              <Input
+                id="stockInicial"
+                name="stockInicial"
+                type="number"
+                step="0.001"
+                min="0"
+                inputMode="decimal"
+                placeholder="0"
+              />
+            </div>
+            <div>
+              <Label htmlFor="ubicacionInicialId">Ubicación</Label>
+              <select
+                id="ubicacionInicialId"
+                name="ubicacionInicialId"
+                defaultValue={ubicaciones[0]?.id ?? ""}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                {ubicaciones.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </section>
+      )}
 
       <div className="flex gap-3 justify-end">
         <Button variant="outline" asChild>

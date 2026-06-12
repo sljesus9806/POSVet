@@ -51,6 +51,7 @@ export default async function ProductosPage({ searchParams }: { searchParams: Se
       tipo={sp.tipo ?? "TODOS"}
       puedeInventario={hasPermission(user, "inventario:editar")}
       puedeEditar={hasPermission(user, "productos:editar")}
+      puedeEliminar={hasPermission(user, "productos:eliminar")}
     />
   );
 }
