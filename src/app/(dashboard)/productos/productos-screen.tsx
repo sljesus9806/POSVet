@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Tag, ArrowLeftRight, ScrollText, PackagePlus, SlidersHorizontal, Pencil, Power } from "lucide-react";
+import { Plus, Tag, ArrowLeftRight, ScrollText, PackagePlus, SlidersHorizontal, Pencil, Power, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,7 @@ import {
   agregarStockAction,
   ajustarStockAction,
   cambiarActivoProductoAction,
+  eliminarProductoAction,
 } from "./inventario-actions";
 
 const TIPOS = ["TODOS", "MEDICAMENTO", "ALIMENTO", "ACCESORIO", "SERVICIO"] as const;
@@ -59,6 +60,7 @@ export function ProductosScreen({
   tipo,
   puedeInventario,
   puedeEditar,
+  puedeEliminar,
 }: {
   productos: ProductoRow[];
   ubicaciones: Ubicacion[];
@@ -68,11 +70,29 @@ export function ProductosScreen({
   tipo: string;
   puedeInventario: boolean;
   puedeEditar: boolean;
+  puedeEliminar: boolean;
 }) {
   const router = useRouter();
   const [modal, setModal] = useState<ModalState>(null);
   const [verAlertas, setVerAlertas] = useState(false);
   const [pending, startTransition] = useTransition();
+
+  function eliminar(p: ProductoRow) {
+    if (!confirm(`¿Eliminar "${p.nombre}"?\n\nSi nunca se ha vendido ni movido, se borra. Si ya tiene historial, se ocultará para no romper los reportes.`)) return;
+    startTransition(async () => {
+      const res = await eliminarProductoAction({ id: p.id });
+      if (res.ok) {
+        toast.success(
+          res.eliminado
+            ? "Producto eliminado"
+            : "Tiene historial: se ocultó en vez de borrarse",
+        );
+        router.refresh();
+      } else {
+        toast.error(res.error ?? "Error");
+      }
+    });
+  }
 
   function cambiarActivo(p: ProductoRow) {
     const accion = p.activo ? "ocultar" : "reactivar";
@@ -219,6 +239,11 @@ export function ProductosScreen({
                       {puedeEditar && (
                         <Button variant="ghost" size="sm" className="h-8" onClick={() => cambiarActivo(p)} disabled={pending} title={p.activo ? "Ocultar" : "Reactivar"}>
                           <Power className={`size-4 ${p.activo ? "" : "text-muted-foreground"}`} />
+                        </Button>
+                      )}
+                      {puedeEliminar && (
+                        <Button variant="ghost" size="sm" className="h-8" onClick={() => eliminar(p)} disabled={pending} title="Eliminar">
+                          <Trash2 className="size-4 text-destructive" />
                         </Button>
                       )}
                     </div>

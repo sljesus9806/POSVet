@@ -13,6 +13,7 @@ import {
   crearProductoSchema,
   productosService,
 } from "@/lib/modules/productos";
+import { inventarioService } from "@/lib/modules/inventario";
 import { requirePermission } from "@/lib/auth-helpers";
 
 export type FormState = { ok: boolean; error?: string; fieldErrors?: Record<string, string[]> };
@@ -71,6 +72,27 @@ export async function crearProductoAction(_prev: FormState, formData: FormData):
       return { ok: false, error: err.message };
     }
     throw err;
+  }
+
+  // Stock inicial opcional: si capturó cantidad + ubicación, registra la entrada.
+  // El costo unitario de la entrada es el "precio unitario" del producto.
+  const stockInicial = parseNumber(formData.get("stockInicial"));
+  const ubicacionInicialId = String(formData.get("ubicacionInicialId") ?? "");
+  if (stockInicial && stockInicial > 0 && ubicacionInicialId) {
+    try {
+      await inventarioService.registrarEntrada(
+        {
+          productoId,
+          ubicacionId: ubicacionInicialId,
+          cantidad: stockInicial,
+          costoUnitario: parseNumber(formData.get("ultimoCosto"), 0)!,
+        },
+        { usuarioId: user.id },
+      );
+    } catch {
+      // El producto ya quedó creado; si el stock inicial falla, puede agregarlo
+      // después desde la pantalla de productos. No abortamos el alta.
+    }
   }
 
   revalidatePath("/productos");

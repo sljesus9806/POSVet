@@ -61,6 +61,20 @@ export async function ajustarStockAction(input: z.input<typeof ajustarStockSchem
   return { ok: true };
 }
 
+export async function eliminarProductoAction(
+  input: { id: string },
+): Promise<ActionResult & { eliminado?: boolean }> {
+  const user = await requirePermission("productos:eliminar");
+  if (!input.id) return { ok: false, error: "Falta el producto" };
+  try {
+    const res = await productosService.eliminar(input.id, { usuarioId: user.id });
+    revalidatePath("/productos");
+    return { ok: true, eliminado: res.eliminado };
+  } catch (e) {
+    return { ok: false, error: mensaje(e, "No se pudo eliminar el producto") };
+  }
+}
+
 export async function cambiarActivoProductoAction(input: { id: string; activo: boolean }): Promise<ActionResult> {
   const user = await requirePermission("productos:editar");
   if (!input.id) return { ok: false, error: "Falta el producto" };
