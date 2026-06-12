@@ -152,6 +152,22 @@ export async function actualizarProductoAction(_prev: FormState, formData: FormD
     throw err;
   }
 
+  // Venta a granel: activa/desactiva y (si hace falta) crea+liga el producto granel.
+  const granelActivo = formData.get("granelActivo") === "on";
+  try {
+    await productosService.configurarGranel(
+      {
+        empaqueId: id,
+        activo: granelActivo,
+        contenido: parseNumber(formData.get("contenidoGranel"), 0),
+        unidadGranel: String(formData.get("unidadGranel") ?? "G"),
+      },
+      { usuarioId: user.id },
+    );
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "No se pudo configurar el granel" };
+  }
+
   revalidatePath("/productos");
   revalidatePath(`/productos/${id}`);
   return { ok: true };

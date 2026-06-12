@@ -22,6 +22,7 @@ export const productosRepository = {
         categoria: { select: { nombre: true } },
         precios: { where: { tipo: "PUBLICO" }, select: { precio: true } },
         inventarios: { select: { stock: true } },
+        productoGranel: { select: { nombre: true, unidadMedida: true } },
       },
       take: 200,
     });

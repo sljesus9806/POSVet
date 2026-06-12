@@ -28,6 +28,11 @@ export type ProductoListado = {
   precioPublico: number | null;
   stockTotal: number;
   activo: boolean;
+  // Granel: si este producto-empaque tiene un granel ligado, datos para "Abrir".
+  productoGranelId: string | null;
+  productoGranelNombre: string | null;
+  contenidoGranel: number | null;
+  granelUnidad: string | null;
 };
 
 export type ProductoDetalle = {
@@ -53,6 +58,9 @@ export type ProductoDetalle = {
   activo: boolean;
   precios: PrecioInfo[];
   lotes: LoteInfo[];
+  // Granel
+  productoGranelId: string | null;
+  contenidoGranel: number | null;
 };
 
 export type CategoriaListado = {

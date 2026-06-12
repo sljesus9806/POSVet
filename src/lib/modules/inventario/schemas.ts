@@ -56,6 +56,17 @@ export const registrarEntradaSchema = z.object({
   observaciones: z.string().trim().max(500).optional(),
 });
 
+// Abrir empaque(s): convierte N empaques (costal) en N×contenido del producto granel.
+export const abrirEmpaqueSchema = z.object({
+  productoEmpaqueId: idSchema,
+  productoGranelId: idSchema,
+  ubicacionId: idSchema,
+  cantidadEmpaques: z.number().positive("Indica cuántos empaques abrir"),
+  contenido: z.number().positive("El contenido por empaque debe ser mayor a 0"),
+  costoUnitarioEmpaque: z.number().nonnegative().default(0),
+});
+
+export type AbrirEmpaqueInput = z.input<typeof abrirEmpaqueSchema>;
 export type AjustarStockInput = z.input<typeof ajustarStockSchema>;
 export type AjustarStockData = z.output<typeof ajustarStockSchema>;
 export type DefinirStockMinimoInput = z.input<typeof definirStockMinimoSchema>;

@@ -32,6 +32,10 @@ export default async function ProductosPage({ searchParams }: { searchParams: Se
     stockTotal: p.stockTotal,
     unidadMedida: p.unidadMedida,
     activo: p.activo,
+    productoGranelId: p.productoGranelId,
+    productoGranelNombre: p.productoGranelNombre,
+    contenidoGranel: p.contenidoGranel,
+    granelUnidad: p.granelUnidad,
   }));
 
   return (

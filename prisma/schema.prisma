@@ -227,6 +227,12 @@ model Producto {
   ultimoCosto         Decimal                @default(0) @db.Decimal(12, 2)
   costoPromedio       Decimal                @default(0) @db.Decimal(12, 2)
   activo              Boolean                @default(true)
+  // Granel: un producto-empaque (ej. costal) apunta a su producto granel (ej. gramos).
+  // contenidoGranel = cuántas unidades granel trae un empaque (ej. 20000 g por costal).
+  productoGranelId    String?
+  contenidoGranel     Decimal?               @db.Decimal(14, 3)
+  productoGranel      Producto?              @relation("EmpaqueGranel", fields: [productoGranelId], references: [id], onDelete: SetNull)
+  empaques            Producto[]             @relation("EmpaqueGranel")
   categoria           Categoria?             @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
   precios             ProductoPrecio[]
   lotes               ProductoLote[]
@@ -243,6 +249,7 @@ model Producto {
   @@index([categoriaId])
   @@index([tipo])
   @@index([activo])
+  @@index([productoGranelId])
 }
 
 model ProductoPrecio {
@@ -297,6 +304,8 @@ enum MotivoMovimiento {
   TRANSFERENCIA_SALIDA
   TRANSFERENCIA_ENTRADA
   STOCK_INICIAL
+  FRACCIONAMIENTO_SALIDA // se abrió un empaque (costal) → baja el empaque
+  FRACCIONAMIENTO_ENTRADA // … y sube el producto granel equivalente
 }
 
 enum EstadoTransferencia {

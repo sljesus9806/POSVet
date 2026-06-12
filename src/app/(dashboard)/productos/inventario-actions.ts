@@ -75,6 +75,36 @@ export async function eliminarProductoAction(
   }
 }
 
+export async function abrirEmpaqueAction(
+  input: { productoId: string; ubicacionId: string; cantidadEmpaques: number },
+): Promise<ActionResult & { empaquesRestantes?: number; granelResultante?: number }> {
+  const user = await requirePermission("inventario:editar");
+  const prod = await productosService.obtener(input.productoId);
+  if (!prod) return { ok: false, error: "Producto no encontrado" };
+  if (!prod.productoGranelId || !prod.contenidoGranel) {
+    return { ok: false, error: "Este producto no está configurado para venta a granel" };
+  }
+  if (!input.ubicacionId) return { ok: false, error: "Elige una ubicación" };
+  if (!(input.cantidadEmpaques > 0)) return { ok: false, error: "Indica cuántos empaques abrir" };
+  try {
+    const res = await inventarioService.abrirEmpaque(
+      {
+        productoEmpaqueId: prod.id,
+        productoGranelId: prod.productoGranelId,
+        ubicacionId: input.ubicacionId,
+        cantidadEmpaques: input.cantidadEmpaques,
+        contenido: prod.contenidoGranel,
+        costoUnitarioEmpaque: prod.costoPromedio || prod.ultimoCosto,
+      },
+      { usuarioId: user.id },
+    );
+    revalidatePath("/productos");
+    return { ok: true, empaquesRestantes: res.empaquesRestantes, granelResultante: res.granelResultante };
+  } catch (e) {
+    return { ok: false, error: mensaje(e, "No se pudo abrir el empaque") };
+  }
+}
+
 export async function cambiarActivoProductoAction(input: { id: string; activo: boolean }): Promise<ActionResult> {
   const user = await requirePermission("productos:editar");
   if (!input.id) return { ok: false, error: "Falta el producto" };
