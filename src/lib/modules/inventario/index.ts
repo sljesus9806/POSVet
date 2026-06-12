@@ -13,6 +13,7 @@ export {
 } from "./service";
 
 export {
+  abrirEmpaqueSchema,
   ajustarStockSchema,
   crearTransferenciaSchema,
   definirStockMinimoSchema,
@@ -21,6 +22,7 @@ export {
 } from "./schemas";
 
 export type {
+  AbrirEmpaqueInput,
   AjustarStockInput,
   CrearTransferenciaInput,
   DefinirStockMinimoInput,

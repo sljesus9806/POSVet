@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Tag, ArrowLeftRight, ScrollText, PackagePlus, SlidersHorizontal, Pencil, Power, Trash2 } from "lucide-react";
+import { Plus, Tag, ArrowLeftRight, ScrollText, PackagePlus, PackageOpen, SlidersHorizontal, Pencil, Power, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/table";
 import { Modal } from "@/components/ui/modal";
 import {
+  abrirEmpaqueAction,
   agregarStockAction,
   ajustarStockAction,
   cambiarActivoProductoAction,
@@ -41,6 +42,10 @@ export type ProductoRow = {
   stockTotal: number;
   unidadMedida: string;
   activo: boolean;
+  productoGranelId: string | null;
+  productoGranelNombre: string | null;
+  contenidoGranel: number | null;
+  granelUnidad: string | null;
 };
 
 type Ubicacion = { id: string; nombre: string };
@@ -49,6 +54,7 @@ type AlertaStock = { productoId: string; sku: string; nombre: string; ubicacionN
 type ModalState =
   | { tipo: "stock"; prod: ProductoRow }
   | { tipo: "ajuste"; prod: ProductoRow }
+  | { tipo: "abrir"; prod: ProductoRow }
   | null;
 
 export function ProductosScreen({
@@ -229,6 +235,11 @@ export function ProductosScreen({
                           <Button variant="ghost" size="sm" className="h-8" onClick={() => setModal({ tipo: "ajuste", prod: p })} title="Ajustar (merma, conteo…)">
                             <SlidersHorizontal className="size-4" />
                           </Button>
+                          {p.productoGranelId && (
+                            <Button variant="ghost" size="sm" className="h-8" onClick={() => setModal({ tipo: "abrir", prod: p })} title={`Abrir para vender a granel (${p.productoGranelNombre ?? "granel"})`}>
+                              <PackageOpen className="size-4" />
+                            </Button>
+                          )}
                         </>
                       )}
                       {puedeEditar && (
@@ -276,6 +287,63 @@ export function ProductosScreen({
           />
         )}
       </Modal>
+
+      {/* Modal: abrir empaque (granel) */}
+      <Modal open={modal?.tipo === "abrir"} onClose={() => setModal(null)} title={`Abrir empaque — ${modal?.prod.nombre ?? ""}`}>
+        {modal?.tipo === "abrir" && (
+          <AbrirForm
+            prod={modal.prod}
+            ubicaciones={ubicaciones}
+            onDone={() => { setModal(null); router.refresh(); }}
+          />
+        )}
+      </Modal>
+    </div>
+  );
+}
+
+function AbrirForm({ prod, ubicaciones, onDone }: { prod: ProductoRow; ubicaciones: Ubicacion[]; onDone: () => void }) {
+  const [ubicacionId, setUbicacionId] = useState(ubicaciones[0]?.id ?? "");
+  const [cantidad, setCantidad] = useState("1");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const empaques = Number(cantidad) || 0;
+  const granelEquivale = empaques > 0 && prod.contenidoGranel ? empaques * prod.contenidoGranel : 0;
+
+  function guardar() {
+    setError(null);
+    startTransition(async () => {
+      const res = await abrirEmpaqueAction({ productoId: prod.id, ubicacionId, cantidadEmpaques: empaques });
+      if (res.ok) {
+        toast.success(`Abriste ${empaques} ${prod.unidadMedida} → ${res.granelResultante} ${prod.granelUnidad ?? ""} de ${prod.productoGranelNombre ?? "granel"}`);
+        onDone();
+      } else {
+        setError(res.error ?? "Error");
+      }
+    });
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">
+        Cada {prod.unidadMedida} rinde <strong>{prod.contenidoGranel} {prod.granelUnidad}</strong> de{" "}
+        <strong>{prod.productoGranelNombre}</strong>. Bajas del empaque y sube el granel.
+      </p>
+      <Campo label="Ubicación">
+        <Select value={ubicacionId} onChange={setUbicacionId} options={ubicaciones.map((u) => ({ value: u.id, label: u.nombre }))} />
+      </Campo>
+      <Campo label={`¿Cuántos ${prod.unidadMedida} abres? (tienes ${prod.stockTotal})`}>
+        <Input type="number" min="0.001" step="0.001" value={cantidad} onChange={(e) => setCantidad(e.target.value)} autoFocus />
+      </Campo>
+      {granelEquivale > 0 && (
+        <p className="text-sm">Equivale a <strong>{granelEquivale} {prod.granelUnidad}</strong> de granel.</p>
+      )}
+      {error && <p className="text-sm text-destructive">{error}</p>}
+      <div className="flex justify-end gap-2 pt-1">
+        <Button variant="outline" onClick={onDone} type="button">Cancelar</Button>
+        <Button onClick={guardar} disabled={pending || empaques <= 0} type="button">{pending ? "Abriendo…" : "Abrir"}</Button>
+      </div>
     </div>
   );
 }

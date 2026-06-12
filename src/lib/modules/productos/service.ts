@@ -80,6 +80,10 @@ function aListado(
     precioPublico: p.precios[0] ? toNumber(p.precios[0].precio) : null,
     stockTotal,
     activo: p.activo,
+    productoGranelId: p.productoGranelId,
+    productoGranelNombre: p.productoGranel?.nombre ?? null,
+    contenidoGranel: p.contenidoGranel != null ? toNumber(p.contenidoGranel) : null,
+    granelUnidad: p.productoGranel?.unidadMedida ?? null,
   };
 }
 
@@ -115,6 +119,8 @@ function aDetalle(
       cantidad: toNumber(l.cantidad),
       costoUnitario: toNumber(l.costoUnitario),
     })),
+    productoGranelId: p.productoGranelId,
+    contenidoGranel: p.contenidoGranel != null ? toNumber(p.contenidoGranel) : null,
   };
 }
 
@@ -293,6 +299,73 @@ export const productosService = {
     });
 
     return { eliminado: true };
+  },
+
+  /**
+   * Configura la venta a granel de un producto-empaque. Si se activa y aún no
+   * tiene granel ligado, crea automáticamente el producto granel ("<nombre>
+   * (granel)") con su precio (precio del empaque ÷ contenido) y lo liga. Si se
+   * desactiva, solo desliga (no borra el granel, puede tener stock/historial).
+   */
+  async configurarGranel(
+    input: { empaqueId: string; activo: boolean; contenido?: number; unidadGranel?: string },
+    ctx: { usuarioId: string; ip?: string | null },
+  ): Promise<void> {
+    const empaque = await productosRepository.buscarPorId(input.empaqueId);
+    if (!empaque) throw new ProductoNoEncontradoError(input.empaqueId);
+
+    if (!input.activo) {
+      if (empaque.productoGranelId) {
+        await productosRepository.actualizar(empaque.id, {
+          productoGranel: { disconnect: true },
+          contenidoGranel: null,
+        });
+      }
+      return;
+    }
+
+    const contenido = input.contenido ?? 0;
+    if (contenido <= 0) throw new Error("El contenido por empaque debe ser mayor a 0");
+
+    let granelId = empaque.productoGranelId;
+    if (!granelId) {
+      const precioEmpaque = empaque.precios.find((p) => p.tipo === "PUBLICO");
+      const precioGranel = precioEmpaque ? toNumber(precioEmpaque.precio) / contenido : 0;
+      const costoGranel = toNumber(empaque.ultimoCosto) / contenido;
+      const granel = await productosRepository.crear({
+        sku: await generarSkuUnico(),
+        nombre: `${empaque.nombre} (granel)`,
+        unidadMedida: input.unidadGranel || "G",
+        tipo: empaque.tipo,
+        claveSAT: empaque.claveSAT,
+        ivaAplicable: empaque.ivaAplicable,
+        ultimoCosto: costoGranel,
+        costoPromedio: costoGranel,
+        precios: { create: [{ tipo: "PUBLICO", precio: precioGranel }] },
+      });
+      granelId = granel.id;
+      await eventBus.emit(PRODUCTO_EVENTS.CREADO, {
+        productoId: granel.id,
+        sku: granel.sku,
+        nombre: granel.nombre,
+        usuarioId: ctx.usuarioId,
+      });
+    }
+
+    await productosRepository.actualizar(empaque.id, {
+      productoGranel: { connect: { id: granelId } },
+      contenidoGranel: contenido,
+    });
+
+    await audit({
+      usuarioId: ctx.usuarioId,
+      modulo: "productos",
+      accion: "configurar_granel",
+      entidad: "producto",
+      entidadId: empaque.id,
+      despues: { granelId, contenido },
+      ip: ctx.ip,
+    });
   },
 
   async crearLote(input: CrearLoteInput, ctx: { usuarioId: string }): Promise<{ id: string }> {

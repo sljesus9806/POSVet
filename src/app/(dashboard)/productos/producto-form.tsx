@@ -82,6 +82,9 @@ export function ProductoForm({ categorias, producto, ubicaciones = [] }: Props) 
     setGanancia(r2(num(v) - num(costo)));
   };
 
+  // Venta a granel (solo edición): abrir un empaque (costal) → producto granel.
+  const [granelOn, setGranelOn] = useState(!!producto?.productoGranelId);
+
   // Si el producto traía una unidad libre que no está en la lista, la conservamos.
   const unidadActual = producto?.unidadMedida ?? "PZA";
   const unidades = UNIDADES.some((u) => u.value === unidadActual)
@@ -312,6 +315,59 @@ export function ProductoForm({ categorias, producto, ubicaciones = [] }: Props) 
           <Err msgs={state.fieldErrors.precios as unknown as string[]} />
         )}
       </section>
+
+      {isEdit && (
+        <section className="rounded-lg border bg-card p-5 space-y-4">
+          <h3 className="font-semibold">Venta a granel</h3>
+          <p className="text-xs text-muted-foreground">
+            Para productos que vienen en empaque (costal, caja) y abres para vender
+            suelto. Al activarlo se crea un producto “{producto?.nombre} (granel)” con
+            su propio precio; luego usa “Abrir” en la lista de productos.
+          </p>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              name="granelActivo"
+              checked={granelOn}
+              onChange={(e) => setGranelOn(e.target.checked)}
+              className="size-4"
+            />
+            Este producto se abre para vender a granel
+          </label>
+          {granelOn && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="contenidoGranel">¿Cuántas unidades sueltas trae un empaque?</Label>
+                <Input
+                  id="contenidoGranel"
+                  name="contenidoGranel"
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  inputMode="decimal"
+                  defaultValue={producto?.contenidoGranel ?? ""}
+                  placeholder="ej. 20000"
+                />
+              </div>
+              <div>
+                <Label htmlFor="unidadGranel">Unidad del granel</Label>
+                <select
+                  id="unidadGranel"
+                  name="unidadGranel"
+                  defaultValue="G"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  {UNIDADES.filter((u) => ["G", "KG", "ML", "L", "PZA"].includes(u.value)).map((u) => (
+                    <option key={u.value} value={u.value}>
+                      {u.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
 
       {!isEdit && ubicaciones.length > 0 && (
         <section className="rounded-lg border bg-card p-5 space-y-4">

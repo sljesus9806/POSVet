@@ -4,10 +4,12 @@ import { eventBus } from "../shared/event-bus";
 import { audit } from "../shared/audit";
 import { inventarioRepository } from "./repository";
 import {
+  abrirEmpaqueSchema,
   ajustarStockSchema,
   crearTransferenciaSchema,
   definirStockMinimoSchema,
   registrarEntradaSchema,
+  type AbrirEmpaqueInput,
   type AjustarStockInput,
   type CrearTransferenciaInput,
   type DefinirStockMinimoInput,
@@ -276,6 +278,111 @@ export const inventarioService = {
       cantidad: data.cantidad,
       stockResultante: resultado.stock,
       usuarioId: ctx.usuarioId,
+    });
+
+    return resultado;
+  },
+
+  /**
+   * Abrir empaque(s): "abrir N costales" para vender a granel. En una sola
+   * transacción: baja N empaques del producto-empaque y sube N×contenido al
+   * producto granel, con sus dos movimientos de kardex (FRACCIONAMIENTO_*).
+   * El costo fluye: costo del granel por unidad = costoEmpaque / contenido.
+   */
+  async abrirEmpaque(input: AbrirEmpaqueInput, ctx: { usuarioId: string; ip?: string | null }) {
+    const data = abrirEmpaqueSchema.parse(input);
+    const cantidadGranel = new D(data.cantidadEmpaques).times(data.contenido);
+    const costoGranelUnit = data.contenido > 0
+      ? new D(data.costoUnitarioEmpaque).div(data.contenido)
+      : new D(0);
+
+    const resultado = await prisma.$transaction(async (tx) => {
+      // 1) Salida del empaque (guarda contra stock negativo bajo concurrencia)
+      const invEmp = await obtenerOCrearInventario(tx, data.productoEmpaqueId, data.ubicacionId);
+      const descuento = await tx.inventario.updateMany({
+        where: { id: invEmp.id, stock: { gte: data.cantidadEmpaques } },
+        data: { stock: { decrement: data.cantidadEmpaques } },
+      });
+      if (descuento.count === 0) {
+        const actual = await tx.inventario.findUniqueOrThrow({ where: { id: invEmp.id } });
+        throw new StockInsuficienteError(
+          data.productoEmpaqueId,
+          data.ubicacionId,
+          Number(new D(data.cantidadEmpaques).minus(actual.stock.toString()).toString()),
+        );
+      }
+      const empActualizado = await tx.inventario.findUniqueOrThrow({ where: { id: invEmp.id } });
+      const movSalida = await tx.inventarioMovimiento.create({
+        data: {
+          productoId: data.productoEmpaqueId,
+          ubicacionId: data.ubicacionId,
+          tipo: "SALIDA",
+          motivo: "FRACCIONAMIENTO_SALIDA",
+          cantidad: data.cantidadEmpaques,
+          stockResultante: empActualizado.stock,
+          usuarioId: ctx.usuarioId,
+          referenciaTipo: "fraccionamiento",
+          referenciaId: data.productoGranelId,
+        },
+      });
+
+      // 2) Entrada al granel + costo promedio ponderado
+      const invGra = await obtenerOCrearInventario(tx, data.productoGranelId, data.ubicacionId);
+      const stockPrevioGra = new D(invGra.stock.toString());
+      const nuevoStockGra = stockPrevioGra.plus(cantidadGranel);
+      await tx.inventario.update({ where: { id: invGra.id }, data: { stock: nuevoStockGra } });
+
+      const prodGra = await tx.producto.findUniqueOrThrow({
+        where: { id: data.productoGranelId },
+        select: { costoPromedio: true },
+      });
+      const promedioPrevio = new D(prodGra.costoPromedio.toString());
+      const nuevoPromedio = nuevoStockGra.gt(0)
+        ? stockPrevioGra
+            .times(promedioPrevio)
+            .plus(cantidadGranel.times(costoGranelUnit))
+            .div(nuevoStockGra)
+        : costoGranelUnit;
+      await tx.producto.update({
+        where: { id: data.productoGranelId },
+        data: { ultimoCosto: costoGranelUnit, costoPromedio: nuevoPromedio },
+      });
+
+      const movEntrada = await tx.inventarioMovimiento.create({
+        data: {
+          productoId: data.productoGranelId,
+          ubicacionId: data.ubicacionId,
+          tipo: "ENTRADA",
+          motivo: "FRACCIONAMIENTO_ENTRADA",
+          cantidad: cantidadGranel,
+          costoUnitario: costoGranelUnit,
+          stockResultante: nuevoStockGra,
+          usuarioId: ctx.usuarioId,
+          referenciaTipo: "fraccionamiento",
+          referenciaId: data.productoEmpaqueId,
+        },
+      });
+
+      return {
+        empaquesRestantes: Number(empActualizado.stock.toString()),
+        granelResultante: Number(nuevoStockGra.toString()),
+        movSalidaId: movSalida.id,
+        movEntradaId: movEntrada.id,
+      };
+    });
+
+    await audit({
+      usuarioId: ctx.usuarioId,
+      modulo: "inventario",
+      accion: "abrir_empaque",
+      entidad: "producto",
+      entidadId: data.productoEmpaqueId,
+      despues: {
+        empaques: data.cantidadEmpaques,
+        granel: Number(cantidadGranel.toString()),
+        ubicacionId: data.ubicacionId,
+      },
+      ip: ctx.ip,
     });
 
     return resultado;
