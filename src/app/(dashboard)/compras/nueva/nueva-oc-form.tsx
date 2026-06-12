@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
-import { Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { Plus, Trash2, PackagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { crearOrdenCompraAction, type FormState } from "../actions";
+import { crearOrdenCompraAction, crearProductoRapidoAction, type FormState } from "../actions";
 import type { CatalogoSugerencia } from "@/lib/modules/compras";
 
 type ProveedorOpt = { id: string; codigo: string; nombre: string };
@@ -51,50 +52,34 @@ export function NuevaOcForm({
   proveedores,
   ubicaciones,
   proveedorIdInicial,
-  sugerenciasIniciales,
+  productos: productosIniciales,
 }: {
   proveedores: ProveedorOpt[];
   ubicaciones: UbicacionOpt[];
   proveedorIdInicial: string | null;
-  sugerenciasIniciales: CatalogoSugerencia[];
+  productos: CatalogoSugerencia[];
 }) {
   const [state, action] = useActionState(crearOrdenCompraAction, initial);
   const [proveedorId, setProveedorId] = useState(proveedorIdInicial ?? "");
   const [ubicacionDestinoId, setUbicacionDestinoId] = useState(
     ubicaciones.find((u) => u.tipo === "BODEGA")?.id ?? ubicaciones[0]?.id ?? "",
   );
-  const [sugerencias, setSugerencias] = useState<CatalogoSugerencia[]>(sugerenciasIniciales);
+  // Catálogo completo (todos los productos). Crece si se crea uno nuevo inline.
+  const [productos, setProductos] = useState<CatalogoSugerencia[]>(productosIniciales);
   const [productoSel, setProductoSel] = useState<string>("");
   const [lineas, setLineas] = useState<LineaLocal[]>([]);
+  const [incluyeIva, setIncluyeIva] = useState(true);
 
-  // Cuando cambia el proveedor, recarga el catálogo via server-side url change.
-  // Para evitar reload de la página, hacemos un fetch al endpoint dedicado.
-  useEffect(() => {
-    if (!proveedorId) {
-      setSugerencias([]);
-      return;
-    }
-    let cancel = false;
-    fetch(`/api/compras/sugerencias?proveedorId=${proveedorId}`)
-      .then((r) => r.json())
-      .then((data: CatalogoSugerencia[]) => {
-        if (!cancel) setSugerencias(data);
-      })
-      .catch(() => {
-        /* ignore */
-      });
-    return () => {
-      cancel = true;
-    };
-  }, [proveedorId]);
+  // Crear producto nuevo inline
+  const [creando, setCreando] = useState(false);
+  const [nuevoNombre, setNuevoNombre] = useState("");
+  const [nuevoPrecio, setNuevoPrecio] = useState("");
+  const [pendingCrear, startCrear] = useTransition();
 
-  function agregarLinea() {
-    if (!productoSel) return;
-    const sug = sugerencias.find((s) => s.productoId === productoSel);
-    if (!sug) return;
+  function agregarDesdeSugerencia(sug: CatalogoSugerencia) {
     if (lineas.some((l) => l.productoId === sug.productoId)) return;
-    setLineas([
-      ...lineas,
+    setLineas((prev) => [
+      ...prev,
       {
         key: `${sug.productoId}-${Date.now()}`,
         productoId: sug.productoId,
@@ -107,7 +92,35 @@ export function NuevaOcForm({
         ivaTasa: sug.ivaAplicable,
       },
     ]);
+  }
+
+  function agregarLinea() {
+    if (!productoSel) return;
+    const sug = productos.find((s) => s.productoId === productoSel);
+    if (!sug) return;
+    agregarDesdeSugerencia(sug);
     setProductoSel("");
+  }
+
+  function crearProductoNuevo() {
+    if (!nuevoNombre.trim()) return;
+    startCrear(async () => {
+      const res = await crearProductoRapidoAction({
+        nombre: nuevoNombre.trim(),
+        precioVenta: Number(nuevoPrecio) || undefined,
+      });
+      if (res.ok && res.producto) {
+        const sug: CatalogoSugerencia = res.producto;
+        setProductos((prev) => [...prev, sug]);
+        agregarDesdeSugerencia(sug);
+        toast.success(`Producto "${sug.nombre}" creado y agregado`);
+        setNuevoNombre("");
+        setNuevoPrecio("");
+        setCreando(false);
+      } else {
+        toast.error(res.error ?? "No se pudo crear el producto");
+      }
+    });
   }
 
   function actualizar(key: string, patch: Partial<LineaLocal>) {
@@ -118,18 +131,25 @@ export function NuevaOcForm({
     setLineas(lineas.filter((l) => l.key !== key));
   }
 
-  const sugerenciasNoUsadas = sugerencias.filter(
+  const sugerenciasNoUsadas = productos.filter(
     (s) => !lineas.some((l) => l.productoId === s.productoId),
   );
 
+  // Totales: si los precios incluyen IVA, la base sale de dividir entre (1+tasa).
   let subtotal = 0;
   let iva = 0;
   for (const l of lineas) {
-    const sub = l.cantidad * l.costoUnitario;
-    subtotal += sub;
-    iva += sub * l.ivaTasa;
+    const total = l.cantidad * l.costoUnitario; // costo capturado
+    if (incluyeIva) {
+      const base = l.costoUnitario / (1 + l.ivaTasa);
+      subtotal += l.cantidad * base;
+      iva += total - l.cantidad * base;
+    } else {
+      subtotal += total;
+      iva += total * l.ivaTasa;
+    }
   }
-  const total = subtotal + iva;
+  const total = incluyeIva ? subtotal + iva : subtotal + iva;
 
   return (
     <form action={action} className="space-y-6">
@@ -143,21 +163,15 @@ export function NuevaOcForm({
         <h3 className="font-semibold">Datos generales</h3>
         <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
           <div className="sm:col-span-5">
-            <Label htmlFor="proveedorId">Proveedor</Label>
+            <Label htmlFor="proveedorId">Proveedor (opcional)</Label>
             <select
               id="proveedorId"
               name="proveedorId"
-              required
               value={proveedorId}
-              onChange={(e) => {
-                setProveedorId(e.target.value);
-                setLineas([]);
-              }}
+              onChange={(e) => setProveedorId(e.target.value)}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             >
-              <option value="" disabled>
-                Selecciona…
-              </option>
+              <option value="">— Sin proveedor —</option>
               {proveedores.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.codigo} · {p.nombre}
@@ -194,41 +208,81 @@ export function NuevaOcForm({
       </section>
 
       <section className="rounded-lg border bg-card p-5 space-y-4">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h3 className="font-semibold">Productos</h3>
             <p className="text-xs text-muted-foreground">
-              {proveedorId
-                ? "Productos del catálogo del proveedor. Los costos sugeridos vienen del catálogo y se pueden ajustar."
-                : "Selecciona un proveedor primero."}
+              Agrega cualquier producto o crea uno nuevo. Captura el costo al que te lo vendieron.
             </p>
           </div>
+          {/* Toggle IVA incluido. Checkbox marcado por defecto → precios con IVA. */}
+          <label className="flex items-center gap-2 text-sm rounded-md border px-3 py-2">
+            <input
+              type="checkbox"
+              name="preciosIncluyenIva"
+              checked={incluyeIva}
+              onChange={(e) => setIncluyeIva(e.target.checked)}
+              className="size-4"
+            />
+            El precio capturado ya incluye IVA
+          </label>
         </div>
 
-        {proveedorId && (
-          <div className="flex items-end gap-2">
-            <div className="flex-1">
-              <Label htmlFor="agregarProducto">Agregar producto</Label>
-              <select
-                id="agregarProducto"
-                value={productoSel}
-                onChange={(e) => setProductoSel(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              >
-                <option value="">
-                  {sugerenciasNoUsadas.length === 0
-                    ? "No hay más productos en el catálogo de este proveedor"
-                    : "Selecciona del catálogo…"}
+        <div className="flex items-end gap-2 flex-wrap">
+          <div className="flex-1 min-w-[240px]">
+            <Label htmlFor="agregarProducto">Agregar producto</Label>
+            <select
+              id="agregarProducto"
+              value={productoSel}
+              onChange={(e) => setProductoSel(e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              <option value="">
+                {sugerenciasNoUsadas.length === 0
+                  ? "No hay más productos en el catálogo"
+                  : "Selecciona del catálogo…"}
+              </option>
+              {sugerenciasNoUsadas.map((s) => (
+                <option key={s.productoId} value={s.productoId}>
+                  {s.sku} · {s.nombre} — {fmtMoneda(s.costoUnitario)} / {s.unidadMedida}
                 </option>
-                {sugerenciasNoUsadas.map((s) => (
-                  <option key={s.productoId} value={s.productoId}>
-                    {s.sku} · {s.nombre} — {fmtMoneda(s.costoUnitario)} / {s.unidadMedida}
-                  </option>
-                ))}
-              </select>
+              ))}
+            </select>
+          </div>
+          <Button type="button" onClick={agregarLinea} disabled={!productoSel}>
+            <Plus className="size-4" /> Agregar
+          </Button>
+          <Button type="button" variant="outline" onClick={() => setCreando((v) => !v)}>
+            <PackagePlus className="size-4" /> Crear producto nuevo
+          </Button>
+        </div>
+
+        {creando && (
+          <div className="rounded-md border bg-muted/40 p-3 flex items-end gap-2 flex-wrap">
+            <div className="flex-1 min-w-[200px]">
+              <Label htmlFor="nuevoNombre">Nombre del producto</Label>
+              <Input
+                id="nuevoNombre"
+                value={nuevoNombre}
+                onChange={(e) => setNuevoNombre(e.target.value)}
+                placeholder="ej. Shampoo antipulgas"
+                autoFocus
+              />
             </div>
-            <Button type="button" onClick={agregarLinea} disabled={!productoSel}>
-              <Plus className="size-4" /> Agregar
+            <div className="w-36">
+              <Label htmlFor="nuevoPrecio">Precio venta (opcional)</Label>
+              <Input
+                id="nuevoPrecio"
+                type="number"
+                step="0.01"
+                min="0"
+                value={nuevoPrecio}
+                onChange={(e) => setNuevoPrecio(e.target.value)}
+                placeholder="0.00"
+              />
+            </div>
+            <Button type="button" onClick={crearProductoNuevo} disabled={pendingCrear || !nuevoNombre.trim()}>
+              {pendingCrear ? "Creando…" : "Crear y agregar"}
             </Button>
           </div>
         )}
@@ -249,8 +303,7 @@ export function NuevaOcForm({
               </TableHeader>
               <TableBody>
                 {lineas.map((l) => {
-                  const sub = l.cantidad * l.costoUnitario;
-                  const tot = sub * (1 + l.ivaTasa);
+                  const tot = l.cantidad * l.costoUnitario * (incluyeIva ? 1 : 1 + l.ivaTasa);
                   return (
                     <TableRow key={l.key}>
                       <TableCell>
@@ -264,9 +317,7 @@ export function NuevaOcForm({
                         <Input
                           name="codigoProveedor"
                           value={l.codigoProveedor}
-                          onChange={(e) =>
-                            actualizar(l.key, { codigoProveedor: e.target.value })
-                          }
+                          onChange={(e) => actualizar(l.key, { codigoProveedor: e.target.value })}
                           className="h-8 text-xs font-mono"
                           placeholder="—"
                         />
@@ -278,9 +329,7 @@ export function NuevaOcForm({
                           step="0.001"
                           min="0.001"
                           value={l.cantidad}
-                          onChange={(e) =>
-                            actualizar(l.key, { cantidad: Number(e.target.value) })
-                          }
+                          onChange={(e) => actualizar(l.key, { cantidad: Number(e.target.value) })}
                           className="h-8 text-right tabular-nums w-24"
                           required
                         />
@@ -292,9 +341,7 @@ export function NuevaOcForm({
                           step="0.0001"
                           min={0}
                           value={l.costoUnitario}
-                          onChange={(e) =>
-                            actualizar(l.key, { costoUnitario: Number(e.target.value) })
-                          }
+                          onChange={(e) => actualizar(l.key, { costoUnitario: Number(e.target.value) })}
                           className="h-8 text-right tabular-nums w-28"
                           required
                         />
@@ -307,9 +354,7 @@ export function NuevaOcForm({
                           min={0}
                           max={1}
                           value={l.ivaTasa}
-                          onChange={(e) =>
-                            actualizar(l.key, { ivaTasa: Number(e.target.value) })
-                          }
+                          onChange={(e) => actualizar(l.key, { ivaTasa: Number(e.target.value) })}
                           className="h-8 text-right tabular-nums w-20"
                         />
                       </TableCell>

@@ -90,10 +90,11 @@ function mapearDetalle(
     id: oc.id,
     folio: oc.folio,
     proveedorId: oc.proveedorId,
-    proveedorNombre: oc.proveedor.nombre,
+    proveedorNombre: oc.proveedor?.nombre ?? null,
     ubicacionDestinoId: oc.ubicacionDestinoId,
     ubicacionDestinoNombre: oc.ubicacionDestino.nombre,
     estado: oc.estado,
+    preciosIncluyenIva: oc.preciosIncluyenIva,
     subtotal: toNumber(oc.subtotal),
     iva: toNumber(oc.iva),
     total: toNumber(oc.total),
@@ -134,8 +135,8 @@ export const comprasService = {
         id: o.id,
         folio: o.folio,
         fecha: o.createdAt,
-        proveedorId: o.proveedor.id,
-        proveedorNombre: o.proveedor.nombre,
+        proveedorId: o.proveedor?.id ?? null,
+        proveedorNombre: o.proveedor?.nombre ?? null,
         ubicacionDestinoNombre: o.ubicacionDestino.nombre,
         estado: o.estado,
         total: toNumber(o.total),
@@ -148,6 +149,20 @@ export const comprasService = {
   async obtenerOrden(id: string): Promise<OrdenCompraDetalle | null> {
     const oc = await comprasRepository.obtenerOrden(id);
     return oc ? mapearDetalle(oc) : null;
+  },
+
+  // Todos los productos activos para el selector de la OC (no solo del proveedor).
+  async productosParaOc(): Promise<CatalogoSugerencia[]> {
+    const filas = await comprasRepository.productosParaOc();
+    return filas.map((p) => ({
+      productoId: p.id,
+      sku: p.sku,
+      nombre: p.nombre,
+      unidadMedida: p.unidadMedida,
+      codigoProveedor: null,
+      costoUnitario: toNumber(p.ultimoCosto),
+      ivaAplicable: toNumber(p.ivaAplicable),
+    }));
   },
 
   async sugerenciasDeProveedor(proveedorId: string): Promise<CatalogoSugerencia[]> {
@@ -182,14 +197,23 @@ export const comprasService = {
       }
     }
 
-    // Totales calculados
+    // Totales calculados. Si los precios YA incluyen IVA, el costo capturado es
+    // el costo CON IVA y la base se obtiene dividiendo entre (1+tasa). Si no, el
+    // IVA se suma encima. En ambos casos guardamos costoUnitario = costo CON IVA
+    // (lo que realmente se paga), que es lo que entra al inventario.
+    const incluyeIva = data.preciosIncluyenIva;
     let subtotal = new D(0);
     let iva = new D(0);
     const lineasData = data.lineas.map((l) => {
       const prod = porId.get(l.productoId)!;
-      const lineaSubtotal = new D(l.cantidad).times(l.costoUnitario);
-      const lineaIva = lineaSubtotal.times(l.ivaTasa ?? 0);
-      const lineaTotal = lineaSubtotal.plus(lineaIva);
+      const tasaMas1 = new D(l.ivaTasa ?? 0).plus(1);
+      const precio = new D(l.costoUnitario);
+      const costoConIva = incluyeIva ? precio : precio.times(tasaMas1);
+      const base = incluyeIva ? precio.div(tasaMas1) : precio;
+      const cant = new D(l.cantidad);
+      const lineaSubtotal = cant.times(base);
+      const lineaTotal = cant.times(costoConIva);
+      const lineaIva = lineaTotal.minus(lineaSubtotal);
       subtotal = subtotal.plus(lineaSubtotal);
       iva = iva.plus(lineaIva);
       return {
@@ -199,7 +223,7 @@ export const comprasService = {
         unidadMedida: prod.unidadMedida,
         codigoProveedor: l.codigoProveedor,
         cantidadSolicitada: l.cantidad,
-        costoUnitario: l.costoUnitario,
+        costoUnitario: costoConIva,
         ivaTasa: l.ivaTasa ?? 0,
         subtotal: lineaSubtotal,
         ivaImporte: lineaIva,
@@ -218,10 +242,11 @@ export const comprasService = {
           const oc = await tx.ordenCompra.create({
             data: {
               folio,
-              proveedorId: data.proveedorId,
+              proveedorId: data.proveedorId ?? null,
               ubicacionDestinoId: data.ubicacionDestinoId,
               usuarioId: ctx.usuarioId,
               estado: "BORRADOR",
+              preciosIncluyenIva: incluyeIva,
               subtotal,
               iva,
               total,
@@ -559,7 +584,7 @@ export const comprasService = {
       fecha: detalle.fechaRecepcion,
       ordenCompraId: detalle.ordenCompraId,
       ordenCompraFolio: detalle.ordenCompra.folio,
-      proveedorNombre: detalle.ordenCompra.proveedor.nombre,
+      proveedorNombre: detalle.ordenCompra.proveedor?.nombre ?? null,
       ubicacionId: detalle.ubicacion.id,
       ubicacionNombre: detalle.ubicacion.nombre,
       usuarioNombre: detalle.usuario.nombre,
@@ -587,7 +612,7 @@ export const comprasService = {
       folio: r.folio,
       fecha: r.fechaRecepcion,
       ordenCompraFolio: r.ordenCompra.folio,
-      proveedorNombre: r.ordenCompra.proveedor.nombre,
+      proveedorNombre: r.ordenCompra.proveedor?.nombre ?? null,
       ubicacionNombre: r.ubicacion.nombre,
       usuarioNombre: r.usuario.nombre,
       totalLineas: r._count.lineas,
@@ -603,7 +628,7 @@ export const comprasService = {
       fecha: r.fechaRecepcion,
       ordenCompraId: r.ordenCompraId,
       ordenCompraFolio: r.ordenCompra.folio,
-      proveedorNombre: r.ordenCompra.proveedor.nombre,
+      proveedorNombre: r.ordenCompra.proveedor?.nombre ?? null,
       ubicacionId: r.ubicacion.id,
       ubicacionNombre: r.ubicacion.nombre,
       usuarioNombre: r.usuario.nombre,

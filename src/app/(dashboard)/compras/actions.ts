@@ -10,6 +10,7 @@ import {
   TransicionOcInvalidaError,
   comprasService,
 } from "@/lib/modules/compras";
+import { productosService } from "@/lib/modules/productos";
 import { requirePermission } from "@/lib/auth-helpers";
 
 export type FormState = { ok: boolean; error?: string; fieldErrors?: Record<string, string[]> };
@@ -57,6 +58,8 @@ export async function crearOrdenCompraAction(_prev: FormState, formData: FormDat
   const input = {
     proveedorId: String(formData.get("proveedorId") ?? ""),
     ubicacionDestinoId: String(formData.get("ubicacionDestinoId") ?? ""),
+    // Checkbox marcado por defecto: los precios capturados YA incluyen IVA.
+    preciosIncluyenIva: formData.get("preciosIncluyenIva") === "on",
     fechaEsperada: String(formData.get("fechaEsperada") ?? ""),
     observaciones: String(formData.get("observaciones") ?? ""),
     lineas: parseLineasOC(formData),
@@ -73,6 +76,50 @@ export async function crearOrdenCompraAction(_prev: FormState, formData: FormDat
   } catch (err) {
     if (err instanceof z.ZodError) return formatZod(err);
     throw err;
+  }
+}
+
+// Crear un producto nuevo desde la OC (cuando no existe en el catálogo).
+export type ProductoRapido = {
+  productoId: string;
+  sku: string;
+  nombre: string;
+  unidadMedida: string;
+  codigoProveedor: string | null;
+  costoUnitario: number;
+  ivaAplicable: number;
+};
+
+export async function crearProductoRapidoAction(
+  input: { nombre: string; precioVenta?: number; unidadMedida?: string },
+): Promise<{ ok: boolean; error?: string; producto?: ProductoRapido }> {
+  const user = await requirePermission("productos:crear");
+  const nombre = input.nombre?.trim();
+  if (!nombre) return { ok: false, error: "Escribe un nombre" };
+  try {
+    const det = await productosService.crear(
+      {
+        nombre,
+        unidadMedida: input.unidadMedida || "PZA",
+        precios: [{ tipo: "PUBLICO", precio: input.precioVenta && input.precioVenta > 0 ? input.precioVenta : 0 }],
+      } as never,
+      { usuarioId: user.id },
+    );
+    revalidatePath("/productos");
+    return {
+      ok: true,
+      producto: {
+        productoId: det.id,
+        sku: det.sku,
+        nombre: det.nombre,
+        unidadMedida: det.unidadMedida,
+        codigoProveedor: null,
+        costoUnitario: det.ultimoCosto,
+        ivaAplicable: det.ivaAplicable,
+      },
+    };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "No se pudo crear el producto" };
   }
 }
 

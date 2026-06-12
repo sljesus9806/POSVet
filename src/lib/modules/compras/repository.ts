@@ -94,6 +94,23 @@ export const comprasRepository = {
     });
   },
 
+  // Todos los productos activos, para el selector de la OC (no solo del proveedor).
+  productosParaOc() {
+    return prisma.producto.findMany({
+      where: { activo: true },
+      orderBy: { nombre: "asc" },
+      take: 1000,
+      select: {
+        id: true,
+        sku: true,
+        nombre: true,
+        unidadMedida: true,
+        ivaAplicable: true,
+        ultimoCosto: true,
+      },
+    });
+  },
+
   // Catálogo del proveedor para sugerir líneas al crear una OC.
   sugerenciasDeProveedor(proveedorId: string) {
     return prisma.proveedorProducto.findMany({
