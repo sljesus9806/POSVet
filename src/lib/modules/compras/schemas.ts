@@ -20,8 +20,9 @@ export const lineaOcSchema = z.object({
 });
 
 export const crearOrdenCompraSchema = z.object({
-  proveedorId: idSchema,
+  proveedorId: idSchema.optional().or(z.literal("").transform(() => undefined)),
   ubicacionDestinoId: idSchema,
+  preciosIncluyenIva: z.boolean().default(true),
   fechaEsperada: z
     .string()
     .optional()

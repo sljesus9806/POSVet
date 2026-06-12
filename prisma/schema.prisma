@@ -622,10 +622,11 @@ enum EstadoOrdenCompra {
 model OrdenCompra {
   id                 String               @id @default(cuid())
   folio              String               @unique // OC-YYYY-NNNNN
-  proveedorId        String
+  proveedorId        String? // opcional: la OC puede no tener proveedor
   ubicacionDestinoId String
   usuarioId          String // creador
   estado             EstadoOrdenCompra    @default(BORRADOR)
+  preciosIncluyenIva Boolean              @default(true) // true: costos capturados YA llevan IVA
   subtotal           Decimal              @default(0) @db.Decimal(12, 2)
   iva                Decimal              @default(0) @db.Decimal(12, 2)
   total              Decimal              @default(0) @db.Decimal(12, 2)
@@ -636,7 +637,7 @@ model OrdenCompra {
   motivoCancelacion  String?
   canceladaPorId     String?
   canceladaEn        DateTime?
-  proveedor          Proveedor            @relation(fields: [proveedorId], references: [id])
+  proveedor          Proveedor?           @relation(fields: [proveedorId], references: [id])
   ubicacionDestino   Ubicacion            @relation(fields: [ubicacionDestinoId], references: [id])
   usuario            Usuario              @relation("OcCreadaPor", fields: [usuarioId], references: [id])
   canceladaPor       Usuario?             @relation("OcCanceladaPor", fields: [canceladaPorId], references: [id])

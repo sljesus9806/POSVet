@@ -119,7 +119,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Sear
                 <TableRow key={o.id}>
                   <TableCell className="font-mono text-xs">{o.folio}</TableCell>
                   <TableCell className="text-sm">{fmtFecha(o.fecha)}</TableCell>
-                  <TableCell className="font-medium">{o.proveedorNombre}</TableCell>
+                  <TableCell className="font-medium">{o.proveedorNombre ?? "Sin proveedor"}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {o.ubicacionDestinoNombre}
                   </TableCell>

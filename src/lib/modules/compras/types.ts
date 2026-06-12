@@ -4,8 +4,8 @@ export type OrdenCompraListado = {
   id: string;
   folio: string;
   fecha: Date;
-  proveedorId: string;
-  proveedorNombre: string;
+  proveedorId: string | null;
+  proveedorNombre: string | null;
   ubicacionDestinoNombre: string;
   estado: EstadoOrdenCompra;
   total: number;
@@ -33,11 +33,12 @@ export type OrdenCompraLinea = {
 export type OrdenCompraDetalle = {
   id: string;
   folio: string;
-  proveedorId: string;
-  proveedorNombre: string;
+  proveedorId: string | null;
+  proveedorNombre: string | null;
   ubicacionDestinoId: string;
   ubicacionDestinoNombre: string;
   estado: EstadoOrdenCompra;
+  preciosIncluyenIva: boolean;
   subtotal: number;
   iva: number;
   total: number;
@@ -83,7 +84,7 @@ export type RecepcionDetalle = {
   fecha: Date;
   ordenCompraId: string;
   ordenCompraFolio: string;
-  proveedorNombre: string;
+  proveedorNombre: string | null;
   ubicacionId: string;
   ubicacionNombre: string;
   usuarioNombre: string;

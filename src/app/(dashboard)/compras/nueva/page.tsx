@@ -18,18 +18,15 @@ export default async function NuevaCompraPage({
   const sp = await searchParams;
   const proveedorIdInicial = sp.proveedorId || null;
 
-  const [proveedores, ubicaciones] = await Promise.all([
+  const [proveedores, ubicaciones, productos] = await Promise.all([
     proveedoresService.listar({ soloActivos: true }),
     prisma.ubicacion.findMany({
       where: { activa: true },
       orderBy: { nombre: "asc" },
       select: { id: true, nombre: true, tipo: true },
     }),
+    comprasService.productosParaOc(),
   ]);
-
-  const sugerencias = proveedorIdInicial
-    ? await comprasService.sugerenciasDeProveedor(proveedorIdInicial)
-    : [];
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -41,15 +38,15 @@ export default async function NuevaCompraPage({
         </Button>
         <h2 className="text-2xl font-semibold tracking-tight mt-1">Nueva orden de compra</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Selecciona proveedor y destino, luego agrega líneas. Al cambiar de proveedor se cargan
-          los productos de su catálogo con precio y código sugeridos.
+          El proveedor es opcional. Agrega cualquier producto o crea uno nuevo ahí mismo.
+          Por defecto el precio capturado ya incluye IVA.
         </p>
       </div>
       <NuevaOcForm
         proveedores={proveedores.map((p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre }))}
         ubicaciones={ubicaciones}
         proveedorIdInicial={proveedorIdInicial}
-        sugerenciasIniciales={sugerencias}
+        productos={productos}
       />
     </div>
   );

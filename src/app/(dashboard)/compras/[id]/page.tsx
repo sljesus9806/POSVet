@@ -97,7 +97,7 @@ export default async function OrdenCompraDetallePage({
       <section className="rounded-lg border bg-card p-5 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
         <div>
           <div className="text-xs text-muted-foreground">Proveedor</div>
-          <div className="font-medium">{oc.proveedorNombre}</div>
+          <div className="font-medium">{oc.proveedorNombre ?? "Sin proveedor"}</div>
         </div>
         <div>
           <div className="text-xs text-muted-foreground">Ubicación destino</div>
