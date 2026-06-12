@@ -53,7 +53,7 @@ export const crearProductoSchema = z.object({
   claveSAT: z.string().trim().min(6).max(20).default("01010101"),
   ivaAplicable: z.number().min(0).max(1).default(0.16),
   ultimoCosto: z.number().nonnegative().default(0),
-  precios: z.array(precioInputSchema).min(1, "Al menos un precio (PUBLICO recomendado)"),
+  precios: z.array(precioInputSchema).min(1, "Captura el precio final de venta"),
 });
 
 export const actualizarProductoSchema = crearProductoSchema.partial().extend({
