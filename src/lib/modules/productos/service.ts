@@ -54,6 +54,15 @@ function toNumber(d: Prisma.Decimal | number | null | undefined): number {
   return typeof d === "number" ? d : Number(d.toString());
 }
 
+// Genera un SKU corto y único (P-XXXXXX) cuando el usuario no captura uno.
+async function generarSkuUnico(): Promise<string> {
+  for (let i = 0; i < 8; i++) {
+    const sku = "P-" + Math.random().toString(36).slice(2, 8).toUpperCase();
+    if (!(await productosRepository.buscarPorSku(sku))) return sku;
+  }
+  throw new Error("No se pudo generar un SKU único, intenta de nuevo");
+}
+
 function aListado(
   p: Awaited<ReturnType<typeof productosRepository.listar>>[number],
 ): ProductoListado {
@@ -123,15 +132,20 @@ export const productosService = {
   async crear(input: CrearProductoInput, ctx: { usuarioId: string; ip?: string | null }): Promise<ProductoDetalle> {
     const data = crearProductoSchema.parse(input);
 
-    const existeSku = await productosRepository.buscarPorSku(data.sku);
-    if (existeSku) throw new SkuDuplicadoError(data.sku);
+    let sku = data.sku;
+    if (sku) {
+      const existeSku = await productosRepository.buscarPorSku(sku);
+      if (existeSku) throw new SkuDuplicadoError(sku);
+    } else {
+      sku = await generarSkuUnico();
+    }
     if (data.codigoBarras) {
       const existeBarras = await productosRepository.buscarPorCodigoBarras(data.codigoBarras);
       if (existeBarras) throw new CodigoBarrasDuplicadoError(data.codigoBarras);
     }
 
     const producto = await productosRepository.crear({
-      sku: data.sku,
+      sku,
       codigoBarras: data.codigoBarras,
       nombre: data.nombre,
       descripcion: data.descripcion,
@@ -244,6 +258,41 @@ export const productosService = {
 
     const detalle = await this.obtener(data.id);
     return detalle!;
+  },
+
+  /**
+   * Borrado inteligente: si el producto no tiene historial transaccional
+   * (ventas, compras, recepciones, transferencias) se elimina de verdad y se
+   * limpian en cascada precios/lotes/stock/movimientos. Si tiene historial, la
+   * BD lo bloquea (FK Restrict) → en vez de borrar, se oculta (activo=false).
+   * Devuelve { eliminado } para que la UI avise qué pasó.
+   */
+  async eliminar(id: string, ctx: { usuarioId: string; ip?: string | null }): Promise<{ eliminado: boolean }> {
+    const actual = await productosRepository.buscarPorId(id);
+    if (!actual) throw new ProductoNoEncontradoError(id);
+
+    try {
+      await productosRepository.eliminar(id);
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2003") {
+        // Tiene movimientos/ventas/compras → no se puede borrar; se oculta.
+        if (actual.activo) await this.actualizar({ id, activo: false }, ctx);
+        return { eliminado: false };
+      }
+      throw err;
+    }
+
+    await audit({
+      usuarioId: ctx.usuarioId,
+      modulo: "productos",
+      accion: "eliminar",
+      entidad: "producto",
+      entidadId: id,
+      antes: { sku: actual.sku, nombre: actual.nombre },
+      ip: ctx.ip,
+    });
+
+    return { eliminado: true };
   },
 
   async crearLote(input: CrearLoteInput, ctx: { usuarioId: string }): Promise<{ id: string }> {

@@ -54,6 +54,12 @@ export const productosRepository = {
     return prisma.producto.update({ where: { id }, data });
   },
 
+  // Borra el producto. La BD limpia en cascada precios/lotes/stock/movimientos;
+  // si hay ventas/compras (FK Restrict) lanza P2003 y el service lo maneja.
+  eliminar(id: string) {
+    return prisma.producto.delete({ where: { id } });
+  },
+
   upsertPrecio(productoId: string, tipo: TipoPrecio, precio: number) {
     return prisma.productoPrecio.upsert({
       where: { productoId_tipo: { productoId, tipo } },
