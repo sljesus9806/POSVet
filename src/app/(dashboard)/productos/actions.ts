@@ -35,11 +35,11 @@ function formatZod(err: z.ZodError): FormState {
 export async function crearProductoAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const user = await requirePermission("productos:crear");
 
-  const precios: Array<{ tipo: "PUBLICO" | "MAYOREO" | "DISTRIBUIDOR"; precio: number }> = [];
-  for (const tipo of ["PUBLICO", "MAYOREO", "DISTRIBUIDOR"] as const) {
-    const p = parseNumber(formData.get(`precio_${tipo}`));
-    if (p !== undefined && p > 0) precios.push({ tipo, precio: p });
-  }
+  // Precio público = precio final de venta. SAT/IVA usan el default de la BD.
+  const precioPublico = parseNumber(formData.get("precio_PUBLICO"));
+  const precios = precioPublico !== undefined && precioPublico > 0
+    ? [{ tipo: "PUBLICO" as const, precio: precioPublico }]
+    : [];
 
   const input = {
     sku: String(formData.get("sku") ?? ""),
@@ -55,8 +55,6 @@ export async function crearProductoAction(_prev: FormState, formData: FormData):
     sustanciaControlada: formData.get("sustanciaControlada") === "on",
     laboratorio: String(formData.get("laboratorio") ?? ""),
     viaAdministracion: String(formData.get("viaAdministracion") ?? ""),
-    claveSAT: String(formData.get("claveSAT") ?? "01010101"),
-    ivaAplicable: parseNumber(formData.get("ivaAplicable"), 0.16)!,
     ultimoCosto: parseNumber(formData.get("ultimoCosto"), 0)!,
     precios,
   };
@@ -91,14 +89,10 @@ export async function actualizarProductoAction(_prev: FormState, formData: FormD
   const id = String(formData.get("id") ?? "");
   if (!id) return { ok: false, error: "Falta el id del producto" };
 
-  const precios: Array<{ tipo: "PUBLICO" | "MAYOREO" | "DISTRIBUIDOR"; precio: number }> = [];
-  for (const tipo of ["PUBLICO", "MAYOREO", "DISTRIBUIDOR"] as const) {
-    const raw = formData.get(`precio_${tipo}`);
-    if (raw !== null && raw !== "") {
-      const p = parseNumber(raw);
-      if (p !== undefined) precios.push({ tipo, precio: p });
-    }
-  }
+  const precioPublico = parseNumber(formData.get("precio_PUBLICO"));
+  const precios = precioPublico !== undefined
+    ? [{ tipo: "PUBLICO" as const, precio: precioPublico }]
+    : undefined;
 
   const input: Record<string, unknown> = {
     id,
@@ -115,11 +109,9 @@ export async function actualizarProductoAction(_prev: FormState, formData: FormD
     sustanciaControlada: formData.get("sustanciaControlada") === "on",
     laboratorio: String(formData.get("laboratorio") ?? ""),
     viaAdministracion: String(formData.get("viaAdministracion") ?? ""),
-    claveSAT: String(formData.get("claveSAT") ?? "01010101"),
-    ivaAplicable: parseNumber(formData.get("ivaAplicable"), 0.16)!,
     ultimoCosto: parseNumber(formData.get("ultimoCosto"), 0)!,
     activo: formData.get("activo") === "on",
-    precios: precios.length ? precios : undefined,
+    precios,
   };
 
   const parsed = actualizarFormSchema.safeParse(input);

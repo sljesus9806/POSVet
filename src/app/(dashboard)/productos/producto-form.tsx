@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,26 @@ import { actualizarProductoAction, crearProductoAction, type FormState } from ".
 import type { ProductoDetalle, CategoriaListado } from "@/lib/modules/productos";
 
 const initial: FormState = { ok: false };
+
+// Unidades comunes. Valor = lo que se guarda (corto, máx 10 chars); label = lo que se ve.
+const UNIDADES = [
+  { value: "PZA", label: "Pieza (PZA)" },
+  { value: "ML", label: "Mililitro (ml)" },
+  { value: "L", label: "Litro (L)" },
+  { value: "KG", label: "Kilogramo (kg)" },
+  { value: "G", label: "Gramo (g)" },
+  { value: "CAJA", label: "Caja" },
+  { value: "PAQUETE", label: "Paquete" },
+  { value: "DOSIS", label: "Dosis" },
+  { value: "SERVICIO", label: "Servicio" },
+] as const;
+
+// Para mostrar/parsear números de dinero sin acarrear errores de coma flotante.
+const num = (s: string) => {
+  const v = parseFloat(s);
+  return Number.isFinite(v) ? v : 0;
+};
+const r2 = (x: number) => String(Math.round(x * 100) / 100);
 
 function Submit({ label }: { label: string }) {
   const { pending } = useFormStatus();
@@ -36,8 +56,36 @@ export function ProductoForm({ categorias, producto }: Props) {
   const action = isEdit ? actualizarProductoAction : crearProductoAction;
   const [state, formAction] = useActionState(action, initial);
 
-  const precio = (tipo: "PUBLICO" | "MAYOREO" | "DISTRIBUIDOR") =>
-    producto?.precios.find((p) => p.tipo === tipo)?.precio ?? "";
+  // --- Precio: costo + ganancia ($) → precio final, enlazados entre sí ---
+  const costoInicial = producto?.ultimoCosto ?? 0;
+  const finalInicial = producto?.precios.find((p) => p.tipo === "PUBLICO")?.precio ?? 0;
+  const [costo, setCosto] = useState(costoInicial ? r2(costoInicial) : "");
+  const [precioFinal, setPrecioFinal] = useState(finalInicial ? r2(finalInicial) : "");
+  const [ganancia, setGanancia] = useState(
+    finalInicial || costoInicial ? r2(finalInicial - costoInicial) : "",
+  );
+
+  // Editar el costo: mantiene la ganancia y recalcula el precio final.
+  const onCosto = (v: string) => {
+    setCosto(v);
+    setPrecioFinal(r2(num(v) + num(ganancia)));
+  };
+  // Editar la ganancia: recalcula el precio final.
+  const onGanancia = (v: string) => {
+    setGanancia(v);
+    setPrecioFinal(r2(num(costo) + num(v)));
+  };
+  // Editar el precio final: recalcula la ganancia.
+  const onPrecioFinal = (v: string) => {
+    setPrecioFinal(v);
+    setGanancia(r2(num(v) - num(costo)));
+  };
+
+  // Si el producto traía una unidad libre que no está en la lista, la conservamos.
+  const unidadActual = producto?.unidadMedida ?? "PZA";
+  const unidades = UNIDADES.some((u) => u.value === unidadActual)
+    ? UNIDADES
+    : [{ value: unidadActual, label: unidadActual }, ...UNIDADES];
 
   const tieneEspecializados = !!(
     producto?.especie ||
@@ -122,7 +170,18 @@ export function ProductoForm({ categorias, producto }: Props) {
           </div>
           <div>
             <Label htmlFor="unidadMedida">Unidad de medida</Label>
-            <Input id="unidadMedida" name="unidadMedida" defaultValue={producto?.unidadMedida ?? "PZA"} required />
+            <select
+              id="unidadMedida"
+              name="unidadMedida"
+              defaultValue={unidadActual}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              {unidades.map((u) => (
+                <option key={u.value} value={u.value}>
+                  {u.label}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <Label htmlFor="marca">Marca</Label>
@@ -195,57 +254,53 @@ export function ProductoForm({ categorias, producto }: Props) {
       </details>
 
       <section className="rounded-lg border bg-card p-5 space-y-4">
-        <h3 className="font-semibold">Fiscal y costos</h3>
+        <h3 className="font-semibold">Precio</h3>
+        <p className="text-xs text-muted-foreground">
+          Captura lo que te cuesta y cuánto quieres ganar. El precio final se calcula
+          solo, pero puedes ajustarlo a mano. Los descuentos se aplican al vender.
+        </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <Label htmlFor="claveSAT">Clave SAT</Label>
-            <Input id="claveSAT" name="claveSAT" defaultValue={producto?.claveSAT ?? "01010101"} />
-          </div>
-          <div>
-            <Label htmlFor="ivaAplicable">IVA (0.00 – 1.00)</Label>
-            <Input
-              id="ivaAplicable"
-              name="ivaAplicable"
-              type="number"
-              step="0.01"
-              min="0"
-              max="1"
-              defaultValue={producto?.ivaAplicable ?? 0.16}
-            />
-          </div>
-          <div>
-            <Label htmlFor="ultimoCosto">Último costo (MXN)</Label>
+            <Label htmlFor="ultimoCosto">Precio unitario (lo que te cuesta)</Label>
             <Input
               id="ultimoCosto"
               name="ultimoCosto"
               type="number"
               step="0.01"
               min="0"
-              defaultValue={producto?.ultimoCosto ?? 0}
+              inputMode="decimal"
+              value={costo}
+              onChange={(e) => onCosto(e.target.value)}
+              placeholder="0.00"
             />
           </div>
-        </div>
-      </section>
-
-      <section className="rounded-lg border bg-card p-5 space-y-4">
-        <h3 className="font-semibold">Precios de venta</h3>
-        <p className="text-xs text-muted-foreground">
-          Deja en blanco los que no apliquen. PUBLICO es el precio default mostrado en el listado.
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {(["PUBLICO", "MAYOREO", "DISTRIBUIDOR"] as const).map((tipo) => (
-            <div key={tipo}>
-              <Label htmlFor={`precio_${tipo}`}>{tipo}</Label>
-              <Input
-                id={`precio_${tipo}`}
-                name={`precio_${tipo}`}
-                type="number"
-                step="0.01"
-                min="0"
-                defaultValue={precio(tipo)}
-              />
-            </div>
-          ))}
+          <div>
+            <Label htmlFor="ganancia">Ganancia ($)</Label>
+            <Input
+              id="ganancia"
+              type="number"
+              step="0.01"
+              inputMode="decimal"
+              value={ganancia}
+              onChange={(e) => onGanancia(e.target.value)}
+              placeholder="0.00"
+            />
+          </div>
+          <div>
+            <Label htmlFor="precio_PUBLICO">Precio final (venta al público)</Label>
+            <Input
+              id="precio_PUBLICO"
+              name="precio_PUBLICO"
+              type="number"
+              step="0.01"
+              min="0"
+              inputMode="decimal"
+              value={precioFinal}
+              onChange={(e) => onPrecioFinal(e.target.value)}
+              placeholder="0.00"
+              className="font-medium"
+            />
+          </div>
         </div>
         {state.fieldErrors?.precios && (
           <Err msgs={state.fieldErrors.precios as unknown as string[]} />
