@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Search, Trash2, X, Banknote, CreditCard, Printer, Wallet } from "lucide-react";
+import { Plus, Search, Trash2, X, Banknote, CreditCard, Printer, Wallet, Pause, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -40,16 +40,39 @@ type LineaCarrito = {
   unidadMedida: string;
   cantidad: number;
   precioUnitario: number; // con IVA
-  descuento: number;
+  descuento: number; // monto en $ o % según descModo
+  descModo: "monto" | "pct";
   ivaTasa: number;
+};
+
+// Una venta suspendida (carrito completo guardado para retomar luego).
+type VentaEnEspera = {
+  id: string;
+  etiqueta: string;
+  creadoEn: number;
+  clienteId: string | null;
+  lineas: LineaCarrito[];
+  descuentoGlobal: number;
+  descGlobalModo?: "monto" | "pct";
+  observaciones: string;
 };
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const fmt = (n: number) =>
   new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n);
 
+// Billetes mexicanos para los botones de cobro rápido en efectivo.
+const DENOMINACIONES = [50, 100, 200, 500, 1000];
+
 function precioDeProducto(p: ProductoVendible, tipo: TipoPrecio): number {
   return p.precios[tipo] ?? p.precios.PUBLICO ?? 0;
+}
+
+// Descuento efectivo de una línea en pesos (interpreta monto $ o %, limitado al bruto).
+function descEfectivoLinea(l: LineaCarrito): number {
+  const bruto = r2(l.precioUnitario * l.cantidad);
+  const raw = l.descModo === "pct" ? r2(bruto * (l.descuento / 100)) : l.descuento;
+  return r2(Math.min(Math.max(0, raw), bruto));
 }
 
 export function POSScreen({
@@ -80,6 +103,7 @@ export function POSScreen({
   const [lineaActivaUid, setLineaActivaUid] = useState<string | null>(null);
 
   const [descuentoGlobal, setDescuentoGlobal] = useState<number>(0);
+  const [descGlobalModo, setDescGlobalModo] = useState<"monto" | "pct">("monto");
   const [observaciones, setObservaciones] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -88,6 +112,18 @@ export function POSScreen({
   const [pagoTarjeta, setPagoTarjeta] = useState<string>("0");
   const [refTarjeta, setRefTarjeta] = useState("");
   const [pagoCredito, setPagoCredito] = useState<string>("0");
+  // false = el efectivo trae el "exacto" precargado; el 1er toque de denominación lo reemplaza.
+  const [efectivoEditado, setEfectivoEditado] = useState(false);
+
+  // Ventas en espera (suspender/recuperar), persistidas por caja en el navegador.
+  const [enEspera, setEnEspera] = useState<VentaEnEspera[]>([]);
+  const [mostrarEnEspera, setMostrarEnEspera] = useState(false);
+  const claveEspera = `pos-espera-${caja.id}`;
+
+  // Consulta de precio (F6): al elegir un producto muestra sus precios sin agregarlo.
+  const [modoConsulta, setModoConsulta] = useState(false);
+  // Última venta cobrada, para reimprimir su recibo sin buscarla en el historial.
+  const [ultimaVenta, setUltimaVenta] = useState<{ ventaId: string; folio: string } | null>(null);
 
   const refBusquedaProducto = useRef<HTMLInputElement | null>(null);
   const refBusquedaCliente = useRef<HTMLInputElement | null>(null);
@@ -101,7 +137,7 @@ export function POSScreen({
     let descuentoLineas = 0;
     for (const l of lineas) {
       const bruto = r2(l.precioUnitario * l.cantidad);
-      const desc = r2(Math.min(l.descuento, bruto));
+      const desc = descEfectivoLinea(l);
       const totalLinea = r2(bruto - desc);
       const sub = r2(totalLinea / (1 + l.ivaTasa));
       const ivaImp = r2(totalLinea - sub);
@@ -113,10 +149,12 @@ export function POSScreen({
     iva = r2(iva);
     descuentoLineas = r2(descuentoLineas);
     const totalAntesDesc = r2(subtotal + iva);
-    const descAplicado = r2(Math.min(descuentoGlobal, totalAntesDesc));
+    const descGlobalBruto =
+      descGlobalModo === "pct" ? r2(totalAntesDesc * (descuentoGlobal / 100)) : descuentoGlobal;
+    const descAplicado = r2(Math.min(Math.max(0, descGlobalBruto), totalAntesDesc));
     const total = r2(totalAntesDesc - descAplicado);
     return { subtotal, iva, descuentoLineas, descuentoAplicado: descAplicado, total };
-  }, [lineas, descuentoGlobal]);
+  }, [lineas, descuentoGlobal, descGlobalModo]);
 
   const pagado = r2(
     (Number(pagoEfectivo) || 0) + (Number(pagoTarjeta) || 0) + (Number(pagoCredito) || 0),
@@ -173,11 +211,28 @@ export function POSScreen({
     if (!q || productos.length === 0) return;
     const exacto = productos.find((p) => p.codigoBarras === q || p.sku === q);
     if (exacto) {
-      agregarProducto(exacto);
-      setProductosQuery("");
+      seleccionarProducto(exacto);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productos]);
+
+  // Cargar/guardar las ventas en espera en localStorage (sobreviven recargas).
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(claveEspera);
+      if (raw) setEnEspera(JSON.parse(raw) as VentaEnEspera[]);
+    } catch {
+      /* storage no disponible o corrupto: se ignora */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem(claveEspera, JSON.stringify(enEspera));
+    } catch {
+      /* sin storage: no pasa nada */
+    }
+  }, [enEspera, claveEspera]);
 
   // ----- Carrito -----
   function agregarProducto(p: ProductoVendible) {
@@ -207,6 +262,7 @@ export function POSScreen({
           cantidad: 1,
           precioUnitario: precio,
           descuento: 0,
+          descModo: "monto",
           ivaTasa: p.ivaTasa,
         },
       ];
@@ -216,7 +272,13 @@ export function POSScreen({
   // Selección desde el dropdown de autocompletar: agrega y deja listo el
   // buscador para el siguiente producto (cierra la lista al limpiar la query).
   function seleccionarProducto(p: ProductoVendible) {
-    agregarProducto(p);
+    if (modoConsulta) {
+      toast(p.nombre, {
+        description: `Público ${fmt(p.precios.PUBLICO ?? 0)} · Mayoreo ${fmt(p.precios.MAYOREO ?? 0)} · Distribuidor ${fmt(p.precios.DISTRIBUIDOR ?? 0)} · Stock ${p.stockUbicacion} ${p.unidadMedida}`,
+      });
+    } else {
+      agregarProducto(p);
+    }
     setProductosQuery("");
     setTimeout(() => refBusquedaProducto.current?.focus(), 0);
   }
@@ -230,14 +292,58 @@ export function POSScreen({
     setLineaActivaUid((curr) => (curr === uid ? null : curr));
   }
 
+  // Navegación del carrito por teclado (flechas mueven la línea activa, +/− la cantidad).
+  function moverLineaActiva(dir: 1 | -1) {
+    if (lineas.length === 0) return;
+    const idx = lineas.findIndex((l) => l.uid === lineaActivaUid);
+    const next = idx < 0 ? (dir === 1 ? 0 : lineas.length - 1) : Math.min(lineas.length - 1, Math.max(0, idx + dir));
+    setLineaActivaUid(lineas[next].uid);
+  }
+  function nudgeCantidad(delta: number) {
+    if (!lineaActivaUid) return;
+    setLineas((prev) =>
+      prev.map((l) => (l.uid === lineaActivaUid ? { ...l, cantidad: Math.max(1, r2(l.cantidad + delta)) } : l)),
+    );
+  }
+
   function limpiarCarrito() {
     setLineas([]);
     setLineaActivaUid(null);
     setDescuentoGlobal(0);
+    setDescGlobalModo("monto");
     setObservaciones("");
     setClienteId(null);
     setClienteQuery("");
     setError(null);
+  }
+
+  // ----- Ventas en espera (suspender / recuperar) -----
+  function suspenderVenta() {
+    if (lineas.length === 0) return;
+    const etiqueta = cliente
+      ? cliente.nombre
+      : `Ticket ${new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`;
+    setEnEspera((prev) => [
+      { id: `esp-${Date.now()}`, etiqueta, creadoEn: Date.now(), clienteId, lineas, descuentoGlobal, descGlobalModo, observaciones },
+      ...prev,
+    ]);
+    limpiarCarrito();
+    toast.success("Venta puesta en espera");
+  }
+  function recuperarVenta(v: VentaEnEspera) {
+    if (lineas.length > 0 && !confirm("El carrito actual se reemplazará. ¿Continuar?")) return;
+    setLineas(v.lineas);
+    setClienteId(v.clienteId);
+    setDescuentoGlobal(v.descuentoGlobal);
+    setDescGlobalModo(v.descGlobalModo ?? "monto");
+    setObservaciones(v.observaciones);
+    setLineaActivaUid(v.lineas[0]?.uid ?? null);
+    setEnEspera((prev) => prev.filter((x) => x.id !== v.id));
+    setMostrarEnEspera(false);
+    setError(null);
+  }
+  function eliminarEnEspera(id: string) {
+    setEnEspera((prev) => prev.filter((x) => x.id !== id));
   }
 
   // ----- Cambio de tipo de precio al cambiar cliente: recalcular precios unitarios -----
@@ -249,8 +355,6 @@ export function POSScreen({
         return { ...l, precioUnitario: precioDeProducto(p, tipoPrecio) };
       }),
     );
-    // Reposicionamos descuento global a 0 al cambiar de cliente
-    setDescuentoGlobal(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tipoPrecio]);
 
@@ -262,11 +366,48 @@ export function POSScreen({
     }
     setError(null);
     setPagoEfectivo(String(calculos.total));
+    setEfectivoEditado(false);
     setPagoTarjeta("0");
     setRefTarjeta("");
     setPagoCredito("0");
     setMostrarCobro(true);
     setTimeout(() => refPagoEfectivo.current?.select(), 0);
+  }
+
+  // Denominaciones rápidas de efectivo. El primer toque (cuando el efectivo aún
+  // trae el "exacto" precargado) reemplaza ese monto; los siguientes suman, así
+  // el cajero teclea "lo que me dio el cliente" (un 200 + un 100, etc.).
+  function tapDenominacion(monto: number) {
+    setPagoEfectivo((prev) => String(r2((efectivoEditado ? Number(prev) || 0 : 0) + monto)));
+    setEfectivoEditado(true);
+    refPagoEfectivo.current?.focus();
+  }
+  function efectivoExacto() {
+    setPagoEfectivo(String(calculos.total));
+    setEfectivoEditado(false);
+  }
+  function limpiarEfectivo() {
+    setPagoEfectivo("0");
+    setEfectivoEditado(true);
+    refPagoEfectivo.current?.focus();
+  }
+  // Pago dividido: pone en tarjeta lo que falte para cubrir el total.
+  function completarConTarjeta() {
+    const falta = r2(Math.max(0, calculos.total - (Number(pagoEfectivo) || 0) - (Number(pagoCredito) || 0)));
+    setPagoTarjeta(String(falta));
+  }
+
+  // Descarga el recibo en PDF sin cambiar de pestaña (reusado por cobrar y reimprimir).
+  function descargarRecibo(ventaId: string, folio: string) {
+    const a = document.createElement("a");
+    a.href = `/ventas/historial/${ventaId}/ticket/pdf`;
+    a.download = `Recibo_${folio}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+  function reimprimirUltima() {
+    if (ultimaVenta) descargarRecibo(ultimaVenta.ventaId, ultimaVenta.folio);
   }
 
   function cobrar() {
@@ -296,12 +437,12 @@ export function POSScreen({
     const payload: CrearVentaInput = {
       cajaId: caja.id,
       clienteId: clienteId ?? undefined,
-      descuentoGlobal: r2(descuentoGlobal),
+      descuentoGlobal: calculos.descuentoAplicado,
       observaciones: observaciones || undefined,
       lineas: lineas.map((l) => ({
         productoId: l.productoId,
         cantidad: l.cantidad,
-        descuento: r2(l.descuento),
+        descuento: descEfectivoLinea(l),
       })),
       pagos,
     };
@@ -314,13 +455,9 @@ export function POSScreen({
         return;
       }
       setMostrarCobro(false);
+      setUltimaVenta({ ventaId: res.ventaId, folio: res.folio });
       // Descarga el recibo en PDF SIN cambiar de pestaña y avisa con un toast.
-      const a = document.createElement("a");
-      a.href = `/ventas/historial/${res.ventaId}/ticket/pdf`;
-      a.download = `Recibo_${res.folio}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      descargarRecibo(res.ventaId, res.folio);
       toast.success(`Venta ${res.folio} cobrada`, {
         description: "El recibo se generó y se descargó en PDF.",
       });
@@ -347,6 +484,11 @@ export function POSScreen({
         e.preventDefault();
         refDescuentoGlobal.current?.focus();
         refDescuentoGlobal.current?.select();
+      } else if (e.key === "F6") {
+        e.preventDefault();
+        setModoConsulta((v) => !v);
+        refBusquedaProducto.current?.focus();
+        refBusquedaProducto.current?.select();
       } else if (e.key === "F8") {
         e.preventDefault();
         if (mostrarCobro) cobrar();
@@ -354,6 +496,24 @@ export function POSScreen({
       } else if (e.key === "F9") {
         e.preventDefault();
         if (lineaActivaUid) eliminarLinea(lineaActivaUid);
+      } else if (e.key === "F7") {
+        e.preventDefault();
+        if (!mostrarCobro) suspenderVenta();
+      } else if (!enInput && !mostrarCobro && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+        e.preventDefault();
+        moverLineaActiva(e.key === "ArrowDown" ? 1 : -1);
+      } else if (!enInput && !mostrarCobro && (e.key === "+" || e.key === "=")) {
+        e.preventDefault();
+        nudgeCantidad(1);
+      } else if (!enInput && !mostrarCobro && e.key === "-") {
+        e.preventDefault();
+        nudgeCantidad(-1);
+      } else if (!enInput && !mostrarCobro && e.key === "Delete") {
+        e.preventDefault();
+        if (lineaActivaUid) eliminarLinea(lineaActivaUid);
+      } else if (e.key === "Escape" && modoConsulta) {
+        e.preventDefault();
+        setModoConsulta(false);
       } else if (e.key === "Escape" && !enInput) {
         e.preventDefault();
         if (mostrarCobro) setMostrarCobro(false);
@@ -363,7 +523,7 @@ export function POSScreen({
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lineaActivaUid, lineas.length, mostrarCobro, calculos.total, pagoEfectivo, pagoTarjeta, pagoCredito]);
+  }, [lineas, lineaActivaUid, mostrarCobro, modoConsulta, clienteId, descuentoGlobal, observaciones, calculos.total, pagoEfectivo, pagoTarjeta, pagoCredito]);
 
   // ----- Filtrado de clientes en client (lista pequeña) -----
   const clientesFiltrados = useMemo(() => {
@@ -384,6 +544,16 @@ export function POSScreen({
       {/* ----------- Panel izquierdo: catálogo ----------- */}
       <section className="space-y-3">
         <div className="bg-card rounded-lg border p-3 space-y-2">
+          {modoConsulta && (
+            <div className="flex items-center justify-between rounded-md bg-amber-100 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 px-2.5 py-1.5 text-xs">
+              <span className="flex items-center gap-1.5 font-medium">
+                <Tag className="size-3.5" /> Consulta de precio — no se agrega al carrito
+              </span>
+              <button type="button" onClick={() => setModoConsulta(false)} className="hover:underline">
+                Salir (Esc)
+              </button>
+            </div>
+          )}
           <div className="relative">
             <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -444,6 +614,15 @@ export function POSScreen({
 
         {/* Ayuda (el panel grande de productos se reemplazó por el autocompletar de arriba) */}
         <div className="bg-card rounded-lg border p-4 text-sm text-muted-foreground space-y-2">
+          {ultimaVenta && (
+            <button
+              type="button"
+              onClick={reimprimirUltima}
+              className="flex items-center gap-2 text-xs text-primary hover:underline"
+            >
+              <Printer className="size-3.5" /> Reimprimir último ticket ({ultimaVenta.folio})
+            </button>
+          )}
           <p>
             Escribe en el buscador para ver productos que coincidan en{" "}
             <span className="font-medium text-foreground">nombre</span>,{" "}
@@ -456,14 +635,60 @@ export function POSScreen({
             Atajos: <span className="font-mono">F2</span> buscar ·{" "}
             <span className="font-mono">F3</span> cliente ·{" "}
             <span className="font-mono">F4</span> descuento ·{" "}
+            <span className="font-mono">F6</span> consulta precio ·{" "}
+            <span className="font-mono">F7</span> suspender ·{" "}
             <span className="font-mono">F8</span> cobrar ·{" "}
-            <span className="font-mono">F9</span> quitar línea.
+            <span className="font-mono">F9</span> quitar línea ·{" "}
+            <span className="font-mono">↑↓</span> línea ·{" "}
+            <span className="font-mono">+/−</span> cantidad.
           </p>
         </div>
       </section>
 
       {/* ----------- Panel derecho: carrito + cliente + totales ----------- */}
       <section className="space-y-3">
+        {/* Ventas en espera */}
+        {enEspera.length > 0 && (
+          <div className="bg-card rounded-lg border">
+            <button
+              type="button"
+              onClick={() => setMostrarEnEspera((v) => !v)}
+              className="w-full px-3 py-2 flex items-center justify-between text-sm font-medium hover:bg-accent/50"
+            >
+              <span className="flex items-center gap-2">
+                <Pause className="size-4" /> En espera ({enEspera.length})
+              </span>
+              <span className="text-xs text-muted-foreground">{mostrarEnEspera ? "Ocultar" : "Ver"}</span>
+            </button>
+            {mostrarEnEspera && (
+              <ul className="border-t divide-y max-h-48 overflow-y-auto">
+                {enEspera.map((v) => (
+                  <li key={v.id} className="flex items-center gap-2 px-3 py-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm truncate">{v.etiqueta}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {v.lineas.length} art. ·{" "}
+                        {new Date(v.creadoEn).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}
+                      </div>
+                    </div>
+                    <Button type="button" size="sm" variant="outline" className="h-7" onClick={() => recuperarVenta(v)}>
+                      Recuperar
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={() => eliminarEnEspera(v.id)}
+                      className="text-muted-foreground hover:text-destructive"
+                      title="Descartar"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
         {/* Cliente */}
         <div className="bg-card rounded-lg border p-3 space-y-2">
           <div className="flex items-center justify-between">
@@ -527,13 +752,22 @@ export function POSScreen({
           <div className="px-3 py-2 border-b flex items-center justify-between bg-muted/30">
             <span className="text-sm font-medium">Carrito ({lineas.length})</span>
             {lineas.length > 0 && (
-              <button
-                type="button"
-                onClick={limpiarCarrito}
-                className="text-xs text-muted-foreground hover:text-destructive flex items-center gap-1"
-              >
-                <X className="size-3" /> Limpiar (ESC)
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={suspenderVenta}
+                  className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                >
+                  <Pause className="size-3" /> Suspender (F7)
+                </button>
+                <button
+                  type="button"
+                  onClick={limpiarCarrito}
+                  className="text-xs text-muted-foreground hover:text-destructive flex items-center gap-1"
+                >
+                  <X className="size-3" /> Limpiar (ESC)
+                </button>
+              </div>
             )}
           </div>
 
@@ -544,8 +778,7 @@ export function POSScreen({
           ) : (
             <div className="max-h-[340px] overflow-y-auto divide-y">
               {lineas.map((l) => {
-                const bruto = r2(l.precioUnitario * l.cantidad);
-                const totalLinea = r2(bruto - Math.min(l.descuento, bruto));
+                const totalLinea = r2(r2(l.precioUnitario * l.cantidad) - descEfectivoLinea(l));
                 const activa = l.uid === lineaActivaUid;
                 return (
                   <div
@@ -570,7 +803,7 @@ export function POSScreen({
                         <Trash2 className="size-4" />
                       </button>
                     </div>
-                    <div className="mt-2 grid grid-cols-[80px_1fr_100px_110px] gap-2 items-center">
+                    <div className="mt-2 grid grid-cols-[64px_1fr_116px_84px] gap-2 items-center">
                       <Input
                         type="number"
                         step="0.001"
@@ -582,22 +815,36 @@ export function POSScreen({
                         onClick={(e) => e.stopPropagation()}
                         className="h-8 text-sm"
                       />
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs text-muted-foreground truncate">
                         × {fmt(l.precioUnitario)} {l.unidadMedida}
                       </span>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="Desc."
-                        value={l.descuento || ""}
-                        onChange={(e) =>
-                          actualizarLinea(l.uid, { descuento: Math.max(0, Number(e.target.value) || 0) })
-                        }
-                        onClick={(e) => e.stopPropagation()}
-                        className="h-8 text-sm"
-                        title="Descuento de la línea en moneda"
-                      />
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            actualizarLinea(l.uid, { descModo: l.descModo === "pct" ? "monto" : "pct" });
+                          }}
+                          className="h-8 w-6 shrink-0 rounded border text-xs font-medium text-muted-foreground hover:bg-accent"
+                          title="Cambiar descuento $ / %"
+                        >
+                          {l.descModo === "pct" ? "%" : "$"}
+                        </button>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="Desc."
+                          value={l.descuento || ""}
+                          onChange={(e) => {
+                            const v = Math.max(0, Number(e.target.value) || 0);
+                            actualizarLinea(l.uid, { descuento: l.descModo === "pct" ? Math.min(100, v) : v });
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="h-8 text-sm"
+                          title="Descuento de la línea"
+                        />
+                      </div>
                       <div className="text-right font-semibold tabular-nums">{fmt(totalLinea)}</div>
                     </div>
                   </div>
@@ -616,20 +863,37 @@ export function POSScreen({
               <span className="text-muted-foreground">IVA</span>
               <span className="tabular-nums">{fmt(calculos.iva)}</span>
             </div>
-            <div className="flex justify-between items-center">
-              <label className="text-muted-foreground flex items-center gap-1">
-                Descuento global (F4)
-              </label>
-              <Input
-                ref={refDescuentoGlobal}
-                type="number"
-                step="0.01"
-                min="0"
-                value={descuentoGlobal || ""}
-                onChange={(e) => setDescuentoGlobal(Math.max(0, Number(e.target.value) || 0))}
-                className="h-7 w-24 text-right tabular-nums"
-              />
+            <div className="flex justify-between items-center gap-2">
+              <span className="text-muted-foreground">Descuento global (F4)</span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setDescGlobalModo((m) => (m === "pct" ? "monto" : "pct"))}
+                  className="h-7 w-7 shrink-0 rounded border text-xs font-medium text-muted-foreground hover:bg-accent"
+                  title="Cambiar descuento $ / %"
+                >
+                  {descGlobalModo === "pct" ? "%" : "$"}
+                </button>
+                <Input
+                  ref={refDescuentoGlobal}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={descuentoGlobal || ""}
+                  onChange={(e) => {
+                    const v = Math.max(0, Number(e.target.value) || 0);
+                    setDescuentoGlobal(descGlobalModo === "pct" ? Math.min(100, v) : v);
+                  }}
+                  className="h-7 w-20 text-right tabular-nums"
+                />
+              </div>
             </div>
+            {descGlobalModo === "pct" && calculos.descuentoAplicado > 0 && (
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>{descuentoGlobal}% de descuento</span>
+                <span className="tabular-nums">− {fmt(calculos.descuentoAplicado)}</span>
+              </div>
+            )}
             <div className="flex justify-between items-center pt-2 border-t mt-1">
               <span className="font-semibold">Total</span>
               <span className="text-xl font-bold tabular-nums">{fmt(calculos.total)}</span>
@@ -657,7 +921,16 @@ export function POSScreen({
       {/* ----------- Modal de cobro ----------- */}
       {mostrarCobro && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-card border rounded-lg shadow-lg w-full max-w-md p-5 space-y-4">
+          <div
+            className="bg-card border rounded-lg shadow-lg w-full max-w-md p-5 space-y-4"
+            onKeyDown={(e) => {
+              // Enter cobra (salvo que el foco esté en un botón, para no anular su clic).
+              if (e.key !== "Enter") return;
+              if ((e.target as HTMLElement).tagName.toLowerCase() === "button") return;
+              e.preventDefault();
+              if (!pendingSave && pagado + 0.001 >= calculos.total) cobrar();
+            }}
+          >
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-lg">Cobrar</h3>
               <button
@@ -685,14 +958,62 @@ export function POSScreen({
                   step="0.01"
                   min="0"
                   value={pagoEfectivo}
-                  onChange={(e) => setPagoEfectivo(e.target.value)}
+                  onChange={(e) => {
+                    setPagoEfectivo(e.target.value);
+                    setEfectivoEditado(true);
+                  }}
                   className="text-lg tabular-nums"
                 />
+                {/* Cobro rápido: billetes + exacto + limpiar */}
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="h-8 px-2.5"
+                    onClick={efectivoExacto}
+                  >
+                    Exacto
+                  </Button>
+                  {DENOMINACIONES.map((d) => (
+                    <Button
+                      key={d}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 px-2.5 tabular-nums"
+                      onClick={() => tapDenominacion(d)}
+                    >
+                      ${d}
+                    </Button>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-2.5 text-muted-foreground"
+                    onClick={limpiarEfectivo}
+                    title="Poner el efectivo en 0"
+                  >
+                    <X className="size-3.5" />
+                  </Button>
+                </div>
               </div>
               <div>
-                <label className="text-sm font-medium flex items-center gap-2">
-                  <CreditCard className="size-4" /> Tarjeta
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <CreditCard className="size-4" /> Tarjeta
+                  </label>
+                  {r2((Number(pagoEfectivo) || 0) + (Number(pagoCredito) || 0)) < calculos.total - 0.005 && (
+                    <button
+                      type="button"
+                      onClick={completarConTarjeta}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Completar con tarjeta
+                    </button>
+                  )}
+                </div>
                 <Input
                   type="number"
                   step="0.01"
@@ -744,10 +1065,21 @@ export function POSScreen({
                 <span className="text-muted-foreground">Recibido</span>
                 <span className="tabular-nums">{fmt(pagado)}</span>
               </div>
-              <div className="flex justify-between font-semibold">
-                <span>Cambio</span>
-                <span className="tabular-nums">{fmt(cambio)}</span>
-              </div>
+              {pagado + 0.005 < calculos.total ? (
+                <div className="flex justify-between items-baseline font-semibold text-destructive">
+                  <span>Falta</span>
+                  <span className="text-xl tabular-nums">{fmt(r2(calculos.total - pagado))}</span>
+                </div>
+              ) : (
+                <div className="flex justify-between items-baseline font-semibold">
+                  <span>Cambio</span>
+                  <span
+                    className={`text-2xl tabular-nums ${cambio > 0 ? "text-emerald-600 dark:text-emerald-400" : ""}`}
+                  >
+                    {fmt(cambio)}
+                  </span>
+                </div>
+              )}
             </div>
 
             {error && (
@@ -766,7 +1098,7 @@ export function POSScreen({
                 disabled={pendingSave || pagado + 0.001 < calculos.total}
               >
                 <Printer className="size-4" />
-                {pendingSave ? "Guardando…" : "Cobrar (F8)"}
+                {pendingSave ? "Guardando…" : "Cobrar (Enter)"}
               </Button>
             </div>
           </div>
