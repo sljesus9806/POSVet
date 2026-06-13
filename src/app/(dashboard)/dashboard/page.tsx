@@ -132,7 +132,7 @@ export default async function DashboardHome() {
             titulo="Alertas de inventario"
             valor={String(numBajo + numCaducar)}
             icono={Boxes}
-            href="/inventario"
+            href="/productos"
             tono={numBajo > 0 ? "danger" : numCaducar > 0 ? "warning" : "default"}
             detalle={
               numBajo + numCaducar === 0

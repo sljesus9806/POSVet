@@ -321,12 +321,12 @@ export function ProductoForm({ categorias, producto, ubicaciones = [] }: Props) 
         )}
       </section>
 
-      {isEdit && (
-        <section className="rounded-lg border bg-card p-5 space-y-4">
+      <section className="rounded-lg border bg-card p-5 space-y-4">
           <h3 className="font-semibold">Venta a granel</h3>
           <p className="text-xs text-muted-foreground">
             Para productos que vienen en empaque (costal, caja) y abres para vender
-            suelto. Al activarlo se crea un producto “{producto?.nombre} (granel)” con
+            suelto. Al activarlo se crea un producto
+            {producto?.nombre ? ` “${producto.nombre} (granel)”` : " “(granel)”"} con
             su propio precio; luego usa “Abrir” en la lista de productos.
           </p>
           <label className="flex items-center gap-2 text-sm">
@@ -372,7 +372,6 @@ export function ProductoForm({ categorias, producto, ubicaciones = [] }: Props) 
             </div>
           )}
         </section>
-      )}
 
       {!isEdit && ubicaciones.length > 0 && (
         <section className="rounded-lg border bg-card p-5 space-y-4">

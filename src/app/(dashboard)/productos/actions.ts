@@ -94,6 +94,23 @@ export async function crearProductoAction(_prev: FormState, formData: FormData):
     }
   }
 
+  // Venta a granel opcional: si lo activó en el alta, crea+liga el producto granel.
+  if (formData.get("granelActivo") === "on") {
+    try {
+      await productosService.configurarGranel(
+        {
+          empaqueId: productoId,
+          activo: true,
+          contenido: parseNumber(formData.get("contenidoGranel"), 0),
+          unidadGranel: String(formData.get("unidadGranel") ?? "G"),
+        },
+        { usuarioId: user.id },
+      );
+    } catch {
+      // No abortamos el alta; el granel se puede configurar después al editar.
+    }
+  }
+
   revalidatePath("/productos");
   revalidatePath(`/productos/${productoId}`);
   redirect(`/productos/${productoId}?ok=creado`);

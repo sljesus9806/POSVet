@@ -211,6 +211,6 @@ export async function registrarRecepcionAction(_prev: FormState, formData: FormD
 
   revalidatePath("/compras");
   revalidatePath(`/compras/${ordenCompraId}`);
-  revalidatePath("/inventario");
+  revalidatePath("/productos");
   return { ok: true };
 }
