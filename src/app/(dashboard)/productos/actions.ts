@@ -33,6 +33,48 @@ function formatZod(err: z.ZodError): FormState {
   };
 }
 
+// Aplica la configuración de venta a granel según el modo elegido en el form:
+// - "esCostal": este producto es un costal que se abre → crea/liga su granel.
+// - "esGranel": este producto se vende a granel → lo liga a su costal de origen
+//   (existente o creado al vuelo).
+// - "ninguno": nada; en edición, si traía costal ligado, lo desliga.
+async function aplicarGranel(
+  productoId: string,
+  formData: FormData,
+  usuarioId: string,
+  opts: { desligarSiNinguno: boolean },
+): Promise<void> {
+  const modo = String(formData.get("granelModo") ?? "ninguno");
+  if (modo === "esCostal") {
+    await productosService.configurarGranel(
+      {
+        empaqueId: productoId,
+        activo: true,
+        contenido: parseNumber(formData.get("contenidoGranel"), 0),
+        unidadGranel: String(formData.get("unidadGranel") ?? "G"),
+      },
+      { usuarioId },
+    );
+  } else if (modo === "esGranel") {
+    const sel = String(formData.get("costalExistenteId") ?? "");
+    await productosService.vincularCostal(
+      {
+        granelId: productoId,
+        costalExistenteId: sel && sel !== "__nuevo__" ? sel : undefined,
+        nuevoCostalNombre: sel === "__nuevo__" ? String(formData.get("nuevoCostalNombre") ?? "") : undefined,
+        nuevoCostalCosto: parseNumber(formData.get("nuevoCostalCosto"), 0),
+        contenido: parseNumber(formData.get("granelContenido"), 0)!,
+      },
+      { usuarioId },
+    );
+  } else if (opts.desligarSiNinguno) {
+    await productosService.configurarGranel(
+      { empaqueId: productoId, activo: false },
+      { usuarioId },
+    );
+  }
+}
+
 export async function crearProductoAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const user = await requirePermission("productos:crear");
 
@@ -94,21 +136,12 @@ export async function crearProductoAction(_prev: FormState, formData: FormData):
     }
   }
 
-  // Venta a granel opcional: si lo activó en el alta, crea+liga el producto granel.
-  if (formData.get("granelActivo") === "on") {
-    try {
-      await productosService.configurarGranel(
-        {
-          empaqueId: productoId,
-          activo: true,
-          contenido: parseNumber(formData.get("contenidoGranel"), 0),
-          unidadGranel: String(formData.get("unidadGranel") ?? "G"),
-        },
-        { usuarioId: user.id },
-      );
-    } catch {
-      // No abortamos el alta; el granel se puede configurar después al editar.
-    }
+  // Venta a granel opcional según el modo elegido (best-effort: no abortamos el
+  // alta si falla; se puede configurar después al editar).
+  try {
+    await aplicarGranel(productoId, formData, user.id, { desligarSiNinguno: false });
+  } catch {
+    // El producto ya quedó creado.
   }
 
   revalidatePath("/productos");
@@ -168,18 +201,9 @@ export async function actualizarProductoAction(_prev: FormState, formData: FormD
     throw err;
   }
 
-  // Venta a granel: activa/desactiva y (si hace falta) crea+liga el producto granel.
-  const granelActivo = formData.get("granelActivo") === "on";
+  // Venta a granel según el modo elegido (costal↔granel). Errores se muestran.
   try {
-    await productosService.configurarGranel(
-      {
-        empaqueId: id,
-        activo: granelActivo,
-        contenido: parseNumber(formData.get("contenidoGranel"), 0),
-        unidadGranel: String(formData.get("unidadGranel") ?? "G"),
-      },
-      { usuarioId: user.id },
-    );
+    await aplicarGranel(id, formData, user.id, { desligarSiNinguno: true });
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "No se pudo configurar el granel" };
   }

@@ -368,6 +368,89 @@ export const productosService = {
     });
   },
 
+  /**
+   * Camino inverso de configurarGranel: parte del producto granel (ej. "kilo
+   * croquetas") y lo liga a SU costal de origen. El costal puede ser uno ya
+   * existente del catálogo o crearse en el momento (nombre + costo). El enlace
+   * es el mismo del esquema (costal.productoGranelId = granel, contenidoGranel =
+   * cuántas unidades del granel trae un costal), así que "Abrir" funciona igual.
+   */
+  async vincularCostal(
+    input: {
+      granelId: string;
+      costalExistenteId?: string;
+      nuevoCostalNombre?: string;
+      nuevoCostalCosto?: number;
+      contenido: number;
+    },
+    ctx: { usuarioId: string; ip?: string | null },
+  ): Promise<{ costalId: string }> {
+    const granel = await productosRepository.buscarPorId(input.granelId);
+    if (!granel) throw new ProductoNoEncontradoError(input.granelId);
+    if (!(input.contenido > 0)) {
+      throw new Error("Indica cuánto trae un costal (mayor a 0)");
+    }
+
+    let costalId = input.costalExistenteId;
+    if (!costalId) {
+      const nombre = (input.nuevoCostalNombre ?? "").trim();
+      if (!nombre) throw new Error("Elige el costal de origen o crea uno nuevo");
+      const costo = input.nuevoCostalCosto ?? 0;
+      const costal = await productosRepository.crear({
+        sku: await generarSkuUnico(),
+        nombre,
+        unidadMedida: "COSTAL",
+        tipo: granel.tipo,
+        claveSAT: granel.claveSAT,
+        ivaAplicable: granel.ivaAplicable,
+        ultimoCosto: costo,
+        costoPromedio: costo,
+        precios: { create: [{ tipo: "PUBLICO", precio: 0 }] },
+      });
+      costalId = costal.id;
+      await eventBus.emit(PRODUCTO_EVENTS.CREADO, {
+        productoId: costal.id,
+        sku: costal.sku,
+        nombre: costal.nombre,
+        usuarioId: ctx.usuarioId,
+      });
+    } else if (costalId === input.granelId) {
+      throw new Error("El costal de origen no puede ser el mismo producto granel");
+    }
+
+    await productosRepository.actualizar(costalId, {
+      productoGranel: { connect: { id: input.granelId } },
+      contenidoGranel: input.contenido,
+    });
+
+    await audit({
+      usuarioId: ctx.usuarioId,
+      modulo: "productos",
+      accion: "vincular_costal_granel",
+      entidad: "producto",
+      entidadId: costalId,
+      despues: { granelId: input.granelId, contenido: input.contenido },
+      ip: ctx.ip,
+    });
+
+    return { costalId };
+  },
+
+  /** Costales de origen ligados a un producto granel, con su stock cerrado. */
+  async costalesDeGranel(
+    granelId: string,
+  ): Promise<{ id: string; sku: string; nombre: string; contenido: number | null; unidadMedida: string; stockCerrado: number }[]> {
+    const costales = await productosRepository.empaquesDeGranel(granelId);
+    return costales.map((c) => ({
+      id: c.id,
+      sku: c.sku,
+      nombre: c.nombre,
+      contenido: c.contenidoGranel != null ? toNumber(c.contenidoGranel) : null,
+      unidadMedida: c.unidadMedida,
+      stockCerrado: c.inventarios.reduce((acc, i) => acc + toNumber(i.stock), 0),
+    }));
+  },
+
   async crearLote(input: CrearLoteInput, ctx: { usuarioId: string }): Promise<{ id: string }> {
     const data = crearLoteSchema.parse(input);
     const producto = await productosRepository.buscarPorId(data.productoId);

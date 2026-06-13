@@ -39,6 +39,22 @@ export const productosRepository = {
     });
   },
 
+  // Costales (empaques) que se abren para surtir este producto granel.
+  empaquesDeGranel(granelId: string) {
+    return prisma.producto.findMany({
+      where: { productoGranelId: granelId },
+      orderBy: { nombre: "asc" },
+      select: {
+        id: true,
+        sku: true,
+        nombre: true,
+        contenidoGranel: true,
+        unidadMedida: true,
+        inventarios: { select: { stock: true } },
+      },
+    });
+  },
+
   buscarPorSku(sku: string) {
     return prisma.producto.findUnique({ where: { sku: sku.toUpperCase() } });
   },
