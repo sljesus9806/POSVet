@@ -76,16 +76,22 @@ export async function eliminarProductoAction(
 }
 
 export async function abrirEmpaqueAction(
-  input: { productoId: string; ubicacionId: string; cantidadEmpaques: number },
+  // `contenido` = cuántas unidades de granel trae cada costal. Se captura al abrir
+  // (no al dar de alta el producto). Si no llega, se usa el guardado del costal.
+  input: { productoId: string; ubicacionId: string; cantidadEmpaques: number; contenido?: number },
 ): Promise<ActionResult & { empaquesRestantes?: number; granelResultante?: number }> {
   const user = await requirePermission("inventario:editar");
   const prod = await productosService.obtener(input.productoId);
   if (!prod) return { ok: false, error: "Producto no encontrado" };
-  if (!prod.productoGranelId || !prod.contenidoGranel) {
-    return { ok: false, error: "Este producto no está configurado para venta a granel" };
+  if (!prod.productoGranelId) {
+    return { ok: false, error: "Este producto no está ligado a un producto a granel" };
   }
   if (!input.ubicacionId) return { ok: false, error: "Elige una ubicación" };
-  if (!(input.cantidadEmpaques > 0)) return { ok: false, error: "Indica cuántos empaques abrir" };
+  if (!(input.cantidadEmpaques > 0)) return { ok: false, error: "Indica cuántos costales abrir" };
+  const contenido = input.contenido && input.contenido > 0 ? input.contenido : prod.contenidoGranel ?? 0;
+  if (!(contenido > 0)) {
+    return { ok: false, error: "Indica cuánto granel trae cada costal" };
+  }
   try {
     const res = await inventarioService.abrirEmpaque(
       {
@@ -93,11 +99,15 @@ export async function abrirEmpaqueAction(
         productoGranelId: prod.productoGranelId,
         ubicacionId: input.ubicacionId,
         cantidadEmpaques: input.cantidadEmpaques,
-        contenido: prod.contenidoGranel,
+        contenido,
         costoUnitarioEmpaque: prod.costoPromedio || prod.ultimoCosto,
       },
       { usuarioId: user.id },
     );
+    // Recuerda el contenido en el costal para próximas aperturas.
+    if (contenido !== prod.contenidoGranel) {
+      await productosService.fijarContenidoGranel(prod.id, contenido);
+    }
     revalidatePath("/productos");
     return { ok: true, empaquesRestantes: res.empaquesRestantes, granelResultante: res.granelResultante };
   } catch (e) {

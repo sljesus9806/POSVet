@@ -381,15 +381,14 @@ export const productosService = {
       costalExistenteId?: string;
       nuevoCostalNombre?: string;
       nuevoCostalCosto?: number;
-      contenido: number;
+      // Cuánto granel trae un costal. Opcional: se define al ABRIR el costal,
+      // no al ligar (así no confunde al dar de alta el producto).
+      contenido?: number;
     },
     ctx: { usuarioId: string; ip?: string | null },
   ): Promise<{ costalId: string }> {
     const granel = await productosRepository.buscarPorId(input.granelId);
     if (!granel) throw new ProductoNoEncontradoError(input.granelId);
-    if (!(input.contenido > 0)) {
-      throw new Error("Indica cuánto trae un costal (mayor a 0)");
-    }
 
     let costalId = input.costalExistenteId;
     if (!costalId) {
@@ -418,10 +417,15 @@ export const productosService = {
       throw new Error("El costal de origen no puede ser el mismo producto granel");
     }
 
-    await productosRepository.actualizar(costalId, {
+    // Solo fijamos el contenido si nos lo dieron; si no, queda como esté (null
+    // hasta la primera apertura del costal, que es donde se captura).
+    const datos: Parameters<typeof productosRepository.actualizar>[1] = {
       productoGranel: { connect: { id: input.granelId } },
-      contenidoGranel: input.contenido,
-    });
+    };
+    if (input.contenido != null && input.contenido > 0) {
+      datos.contenidoGranel = input.contenido;
+    }
+    await productosRepository.actualizar(costalId, datos);
 
     await audit({
       usuarioId: ctx.usuarioId,
@@ -429,11 +433,17 @@ export const productosService = {
       accion: "vincular_costal_granel",
       entidad: "producto",
       entidadId: costalId,
-      despues: { granelId: input.granelId, contenido: input.contenido },
+      despues: { granelId: input.granelId, contenido: input.contenido ?? null },
       ip: ctx.ip,
     });
 
     return { costalId };
+  },
+
+  /** Fija cuánto granel trae un costal (se captura al abrirlo la primera vez). */
+  async fijarContenidoGranel(costalId: string, contenido: number): Promise<void> {
+    if (!(contenido > 0)) return;
+    await productosRepository.actualizar(costalId, { contenidoGranel: contenido });
   },
 
   /** Costales de origen ligados a un producto granel, con su stock cerrado. */

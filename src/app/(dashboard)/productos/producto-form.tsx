@@ -113,10 +113,14 @@ export function ProductoForm({
   const [granelModo, setGranelModo] = useState<"ninguno" | "esGranel" | "esCostal">(
     producto?.productoGranelId ? "esCostal" : costalOrigen ? "esGranel" : "ninguno",
   );
-  // Costal de origen elegido cuando el producto se vende a granel ("" = ninguno,
-  // "__nuevo__" = crear uno nuevo, o el id de un producto existente).
-  const [costalSel, setCostalSel] = useState<string>(costalOrigen?.id ?? "");
-  // Unidad de este producto, en vivo, para etiquetar "¿cuánto trae un costal?".
+  // Costal de origen: se ESCRIBE el nombre. Si coincide con uno existente se liga;
+  // si no, se crea con ese nombre. (Cuánto trae el costal se define al abrirlo.)
+  const [costalNombre, setCostalNombre] = useState<string>(costalOrigen?.nombre ?? "");
+  const costalExistente = productosCostal.find(
+    (p) => p.nombre.trim().toLowerCase() === costalNombre.trim().toLowerCase(),
+  );
+  const costalEsNuevo = costalNombre.trim().length > 0 && !costalExistente;
+  // Unidad de este producto, en vivo, para los textos de granel.
   const [unidadGranelActual, setUnidadGranelActual] = useState(producto?.unidadMedida ?? "PZA");
 
   // Si el producto traía una unidad libre que no está en la lista, la conservamos.
@@ -386,65 +390,57 @@ export function ProductoForm({
                   ` Costal de origen: ${costalOrigen.nombre} (${costalOrigen.stockCerrado} cerrados).`}
               </p>
             )}
+            <input
+              type="hidden"
+              name="costalExistenteId"
+              value={costalExistente?.id ?? ""}
+            />
             <div>
-              <Label htmlFor="costalExistenteId">¿De qué costal sale?</Label>
-              <select
-                id="costalExistenteId"
-                name="costalExistenteId"
-                value={costalSel}
-                onChange={(e) => setCostalSel(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              >
-                <option value="">— Elige un costal —</option>
-                <option value="__nuevo__">➕ Crear costal nuevo</option>
+              <Label htmlFor="costalNombre">¿De qué costal sale?</Label>
+              <Input
+                id="costalNombre"
+                name="costalNombre"
+                list="costales-sugeridos"
+                value={costalNombre}
+                onChange={(e) => setCostalNombre(e.target.value)}
+                placeholder="Escribe el costal (ej. Costal Croquetas Perrón 20 kg)"
+                autoComplete="off"
+              />
+              <datalist id="costales-sugeridos">
                 {productosCostal.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre} ({p.sku})
+                  <option key={p.id} value={p.nombre}>
+                    {p.sku}
                   </option>
                 ))}
-              </select>
+              </datalist>
+              <p className="text-xs text-muted-foreground mt-1">
+                {costalExistente
+                  ? `Se ligará al costal existente “${costalExistente.nombre}”.`
+                  : costalEsNuevo
+                    ? "No existe: se creará un costal nuevo con ese nombre."
+                    : "Escribe el nombre del costal; si ya existe lo ligamos, si no lo creamos."}
+              </p>
             </div>
 
-            {costalSel === "__nuevo__" && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="nuevoCostalNombre">Nombre del costal</Label>
-                  <Input
-                    id="nuevoCostalNombre"
-                    name="nuevoCostalNombre"
-                    placeholder="ej. Costal Croquetas Perrón 20 kg"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="nuevoCostalCosto">¿Cuánto te cuesta el costal?</Label>
-                  <Input
-                    id="nuevoCostalCosto"
-                    name="nuevoCostalCosto"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    inputMode="decimal"
-                    placeholder="0.00"
-                  />
-                </div>
+            {costalEsNuevo && (
+              <div className="sm:max-w-xs">
+                <Label htmlFor="nuevoCostalCosto">¿Cuánto te cuesta el costal? (opcional)</Label>
+                <Input
+                  id="nuevoCostalCosto"
+                  name="nuevoCostalCosto"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  inputMode="decimal"
+                  placeholder="0.00"
+                />
               </div>
             )}
 
-            <div className="sm:max-w-xs">
-              <Label htmlFor="granelContenido">
-                ¿Cuánto ({unidadGranelActual}) trae un costal?
-              </Label>
-              <Input
-                id="granelContenido"
-                name="granelContenido"
-                type="number"
-                step="0.001"
-                min="0"
-                inputMode="decimal"
-                defaultValue={costalOrigen?.contenido ?? ""}
-                placeholder="ej. 20"
-              />
-            </div>
+            <p className="text-xs text-muted-foreground">
+              Cuántos {unidadGranelActual} trae el costal se define al “Abrir” un costal
+              desde la lista de productos; al venderlo, el granel resta de lo abierto.
+            </p>
           </div>
         )}
 
