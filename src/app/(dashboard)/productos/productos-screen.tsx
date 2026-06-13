@@ -320,18 +320,23 @@ export function ProductosScreen({
 function AbrirForm({ prod, ubicaciones, onDone }: { prod: ProductoRow; ubicaciones: Ubicacion[]; onDone: () => void }) {
   const [ubicacionId, setUbicacionId] = useState(ubicaciones[0]?.id ?? "");
   const [cantidad, setCantidad] = useState("1");
+  // Cuánto granel trae cada costal. Se captura aquí (al abrir); si ya se había
+  // definido antes, viene de regalo.
+  const [contenido, setContenido] = useState(prod.contenidoGranel ? String(prod.contenidoGranel) : "");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const empaques = Number(cantidad) || 0;
-  const granelEquivale = empaques > 0 && prod.contenidoGranel ? empaques * prod.contenidoGranel : 0;
+  const porCostal = Number(contenido) || 0;
+  const granelUnidad = prod.granelUnidad ?? "";
+  const granelEquivale = empaques > 0 && porCostal > 0 ? empaques * porCostal : 0;
 
   function guardar() {
     setError(null);
     startTransition(async () => {
-      const res = await abrirEmpaqueAction({ productoId: prod.id, ubicacionId, cantidadEmpaques: empaques });
+      const res = await abrirEmpaqueAction({ productoId: prod.id, ubicacionId, cantidadEmpaques: empaques, contenido: porCostal });
       if (res.ok) {
-        toast.success(`Abriste ${empaques} ${prod.unidadMedida} → ${res.granelResultante} ${prod.granelUnidad ?? ""} de ${prod.productoGranelNombre ?? "granel"}`);
+        toast.success(`Abriste ${empaques} ${prod.unidadMedida} → ${res.granelResultante} ${granelUnidad} de ${prod.productoGranelNombre ?? "granel"}`);
         onDone();
       } else {
         setError(res.error ?? "Error");
@@ -342,22 +347,27 @@ function AbrirForm({ prod, ubicaciones, onDone }: { prod: ProductoRow; ubicacion
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
-        Cada {prod.unidadMedida} rinde <strong>{prod.contenidoGranel} {prod.granelUnidad}</strong> de{" "}
-        <strong>{prod.productoGranelNombre}</strong>. Bajas del empaque y sube el granel.
+        Al abrir, baja del costal y sube a <strong>{prod.productoGranelNombre ?? "granel"}</strong>;
+        al vender el granel se va restando de lo abierto.
       </p>
       <Campo label="Ubicación">
         <Select value={ubicacionId} onChange={setUbicacionId} options={ubicaciones.map((u) => ({ value: u.id, label: u.nombre }))} />
       </Campo>
-      <Campo label={`¿Cuántos ${prod.unidadMedida} abres? (tienes ${prod.stockTotal})`}>
-        <Input type="number" min="0.001" step="0.001" value={cantidad} onChange={(e) => setCantidad(e.target.value)} autoFocus />
-      </Campo>
+      <div className="grid grid-cols-2 gap-3">
+        <Campo label={`¿Cuántos costales abres? (tienes ${prod.stockTotal})`}>
+          <Input type="number" min="0.001" step="0.001" value={cantidad} onChange={(e) => setCantidad(e.target.value)} autoFocus />
+        </Campo>
+        <Campo label={`¿Cuántos ${granelUnidad} trae cada costal?`}>
+          <Input type="number" min="0.001" step="0.001" value={contenido} onChange={(e) => setContenido(e.target.value)} placeholder="ej. 20000" />
+        </Campo>
+      </div>
       {granelEquivale > 0 && (
-        <p className="text-sm">Equivale a <strong>{granelEquivale} {prod.granelUnidad}</strong> de granel.</p>
+        <p className="text-sm">Equivale a <strong>{granelEquivale} {granelUnidad}</strong> de granel.</p>
       )}
       {error && <p className="text-sm text-destructive">{error}</p>}
       <div className="flex justify-end gap-2 pt-1">
         <Button variant="outline" onClick={onDone} type="button">Cancelar</Button>
-        <Button onClick={guardar} disabled={pending || empaques <= 0} type="button">{pending ? "Abriendo…" : "Abrir"}</Button>
+        <Button onClick={guardar} disabled={pending || empaques <= 0 || porCostal <= 0} type="button">{pending ? "Abriendo…" : "Abrir"}</Button>
       </div>
     </div>
   );

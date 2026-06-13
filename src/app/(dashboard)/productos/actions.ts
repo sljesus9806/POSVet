@@ -56,14 +56,18 @@ async function aplicarGranel(
       { usuarioId },
     );
   } else if (modo === "esGranel") {
+    // Se escribe el nombre del costal: si coincide con uno existente viene su id
+    // en costalExistenteId; si no, se crea con ese nombre. El contenido (cuánto
+    // trae) NO se pide aquí: se captura al abrir el costal.
     const sel = String(formData.get("costalExistenteId") ?? "");
+    const nombre = String(formData.get("costalNombre") ?? "").trim();
+    if (!sel && !nombre) throw new Error("Escribe de qué costal sale");
     await productosService.vincularCostal(
       {
         granelId: productoId,
-        costalExistenteId: sel && sel !== "__nuevo__" ? sel : undefined,
-        nuevoCostalNombre: sel === "__nuevo__" ? String(formData.get("nuevoCostalNombre") ?? "") : undefined,
+        costalExistenteId: sel || undefined,
+        nuevoCostalNombre: sel ? undefined : nombre,
         nuevoCostalCosto: parseNumber(formData.get("nuevoCostalCosto"), 0),
-        contenido: parseNumber(formData.get("granelContenido"), 0)!,
       },
       { usuarioId },
     );
