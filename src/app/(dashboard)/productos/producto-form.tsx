@@ -57,29 +57,34 @@ export function ProductoForm({ categorias, producto, ubicaciones = [] }: Props) 
   const action = isEdit ? actualizarProductoAction : crearProductoAction;
   const [state, formAction] = useActionState(action, initial);
 
-  // --- Precio: costo + ganancia ($) → precio final, enlazados entre sí ---
+  // --- Precio: costo + ganancia (%) → precio final, enlazados entre sí ---
   const costoInicial = producto?.ultimoCosto ?? 0;
   const finalInicial = producto?.precios.find((p) => p.tipo === "PUBLICO")?.precio ?? 0;
+  // % de ganancia sobre el costo: pct = (final/costo − 1) · 100
+  const pctDe = (final: number, costo: number) => (costo > 0 ? (final / costo - 1) * 100 : 0);
+  // precio final a partir del % de ganancia: final = costo · (1 + pct/100)
+  const finalDe = (costo: number, pct: number) => costo * (1 + pct / 100);
+
   const [costo, setCosto] = useState(costoInicial ? r2(costoInicial) : "");
   const [precioFinal, setPrecioFinal] = useState(finalInicial ? r2(finalInicial) : "");
   const [ganancia, setGanancia] = useState(
-    finalInicial || costoInicial ? r2(finalInicial - costoInicial) : "",
+    costoInicial > 0 && finalInicial ? r2(pctDe(finalInicial, costoInicial)) : "",
   );
 
-  // Editar el costo: mantiene la ganancia y recalcula el precio final.
+  // Editar el costo: mantiene el % de ganancia y recalcula el precio final.
   const onCosto = (v: string) => {
     setCosto(v);
-    setPrecioFinal(r2(num(v) + num(ganancia)));
+    setPrecioFinal(r2(finalDe(num(v), num(ganancia))));
   };
-  // Editar la ganancia: recalcula el precio final.
+  // Editar el % de ganancia: recalcula el precio final.
   const onGanancia = (v: string) => {
     setGanancia(v);
-    setPrecioFinal(r2(num(costo) + num(v)));
+    setPrecioFinal(r2(finalDe(num(costo), num(v))));
   };
-  // Editar el precio final: recalcula la ganancia.
+  // Editar el precio final: recalcula el % de ganancia.
   const onPrecioFinal = (v: string) => {
     setPrecioFinal(v);
-    setGanancia(r2(num(v) - num(costo)));
+    setGanancia(num(costo) > 0 ? r2(pctDe(num(v), num(costo))) : "");
   };
 
   // Venta a granel (solo edición): abrir un empaque (costal) → producto granel.
@@ -284,15 +289,15 @@ export function ProductoForm({ categorias, producto, ubicaciones = [] }: Props) 
             />
           </div>
           <div>
-            <Label htmlFor="ganancia">Ganancia ($)</Label>
+            <Label htmlFor="ganancia">Ganancia (%)</Label>
             <Input
               id="ganancia"
               type="number"
-              step="0.01"
+              step="0.1"
               inputMode="decimal"
               value={ganancia}
               onChange={(e) => onGanancia(e.target.value)}
-              placeholder="0.00"
+              placeholder="0"
             />
           </div>
           <div>
@@ -373,37 +378,25 @@ export function ProductoForm({ categorias, producto, ubicaciones = [] }: Props) 
         <section className="rounded-lg border bg-card p-5 space-y-4">
           <h3 className="font-semibold">Stock inicial</h3>
           <p className="text-xs text-muted-foreground">
-            Opcional. Cuántas existencias tienes ahora mismo. Después puedes agregar
+            Opcional. Escribe la cantidad que tienes en cada ubicación; puedes llenar
+            varias a la vez. Deja en blanco las que no apliquen. Después puedes agregar
             o ajustar desde la pantalla de productos.
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="stockInicial">Cantidad</Label>
-              <Input
-                id="stockInicial"
-                name="stockInicial"
-                type="number"
-                step="0.001"
-                min="0"
-                inputMode="decimal"
-                placeholder="0"
-              />
-            </div>
-            <div>
-              <Label htmlFor="ubicacionInicialId">Ubicación</Label>
-              <select
-                id="ubicacionInicialId"
-                name="ubicacionInicialId"
-                defaultValue={ubicaciones[0]?.id ?? ""}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              >
-                {ubicaciones.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
+            {ubicaciones.map((u) => (
+              <div key={u.id}>
+                <Label htmlFor={`stock_${u.id}`}>{u.nombre}</Label>
+                <Input
+                  id={`stock_${u.id}`}
+                  name={`stock_${u.id}`}
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  inputMode="decimal"
+                  placeholder="0"
+                />
+              </div>
+            ))}
           </div>
         </section>
       )}

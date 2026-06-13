@@ -74,23 +74,22 @@ export async function crearProductoAction(_prev: FormState, formData: FormData):
     throw err;
   }
 
-  // Stock inicial opcional: si capturó cantidad + ubicación, registra la entrada.
+  // Stock inicial opcional: el form manda un campo `stock_<ubicacionId>` por
+  // ubicación. Registra una entrada por cada una con cantidad > 0.
   // El costo unitario de la entrada es el "precio unitario" del producto.
-  const stockInicial = parseNumber(formData.get("stockInicial"));
-  const ubicacionInicialId = String(formData.get("ubicacionInicialId") ?? "");
-  if (stockInicial && stockInicial > 0 && ubicacionInicialId) {
+  const costoUnitario = parseNumber(formData.get("ultimoCosto"), 0)!;
+  for (const [key, value] of formData.entries()) {
+    if (!key.startsWith("stock_")) continue;
+    const ubicacionId = key.slice("stock_".length);
+    const cantidad = parseNumber(value);
+    if (!ubicacionId || !cantidad || cantidad <= 0) continue;
     try {
       await inventarioService.registrarEntrada(
-        {
-          productoId,
-          ubicacionId: ubicacionInicialId,
-          cantidad: stockInicial,
-          costoUnitario: parseNumber(formData.get("ultimoCosto"), 0)!,
-        },
+        { productoId, ubicacionId, cantidad, costoUnitario },
         { usuarioId: user.id },
       );
     } catch {
-      // El producto ya quedó creado; si el stock inicial falla, puede agregarlo
+      // El producto ya quedó creado; si una entrada falla, puede agregarla
       // después desde la pantalla de productos. No abortamos el alta.
     }
   }
