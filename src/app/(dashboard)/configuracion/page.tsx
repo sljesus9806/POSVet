@@ -76,8 +76,7 @@ export default async function ConfiguracionPage({
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <p className="text-sm text-muted-foreground">
-              Estas ubicaciones aparecen en inventario, transferencias, cajas, ventas y
-              compras.
+              Estas ubicaciones aparecen en inventario, cajas, ventas y compras.
             </p>
             <div className="flex items-center gap-3">
               <Link

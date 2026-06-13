@@ -33,8 +33,8 @@ export default async function MovimientosPage({ searchParams }: { searchParams: 
     <div className="space-y-6">
       <div>
         <Button variant="ghost" size="sm" asChild className="-ml-2">
-          <Link href="/inventario">
-            <ArrowLeft className="size-4" /> Volver a inventario
+          <Link href="/productos">
+            <ArrowLeft className="size-4" /> Volver a productos
           </Link>
         </Button>
         <h2 className="text-2xl font-semibold tracking-tight mt-1">Kardex de movimientos</h2>
