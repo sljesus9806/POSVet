@@ -30,12 +30,30 @@ export default async function ProductoDetallePage({
   const { id } = await params;
   const sp = await searchParams;
 
-  const [producto, categorias, stockResumen] = await Promise.all([
+  const [producto, categorias, stockResumen, productos, costales] = await Promise.all([
     productosService.obtener(id),
     categoriasService.listar(),
     inventarioService.stockDeProducto(id),
+    productosService.listar({ soloActivos: true }),
+    productosService.costalesDeGranel(id),
   ]);
   if (!producto) notFound();
+
+  // Candidatos a costal de origen (cualquier producto activo menos este mismo).
+  const productosCostal = productos
+    .filter((p) => p.id !== id)
+    .map((p) => ({ id: p.id, nombre: p.nombre, sku: p.sku }));
+  // Si algún costal apunta a este producto, este producto se vende a granel.
+  const c = costales[0];
+  const costalOrigen = c
+    ? {
+        id: c.id,
+        nombre: c.nombre,
+        contenido: c.contenido,
+        unidadMedida: c.unidadMedida,
+        stockCerrado: c.stockCerrado,
+      }
+    : null;
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -101,7 +119,13 @@ export default async function ProductoDetallePage({
         </section>
       )}
 
-      <ProductoForm producto={producto} categorias={categorias} />
+      <ProductoForm
+        producto={producto}
+        categorias={categorias}
+        productosCostal={productosCostal}
+        costalOrigen={costalOrigen}
+        stockGranelAbierto={stockResumen?.stockTotal ?? 0}
+      />
 
       <section className="rounded-lg border bg-card p-5 space-y-4">
         <h3 className="font-semibold">Lotes</h3>

@@ -46,13 +46,34 @@ function Err({ msgs }: { msgs?: string[] }) {
   return <p className="text-xs text-destructive mt-1">{msgs.join(" · ")}</p>;
 }
 
+type CostalOrigen = {
+  id: string;
+  nombre: string;
+  contenido: number | null;
+  unidadMedida: string;
+  stockCerrado: number;
+};
+
 type Props = {
   categorias: CategoriaListado[];
   producto?: ProductoDetalle;
   ubicaciones?: { id: string; nombre: string }[];
+  // Para ligar un granel a su costal: catálogo de productos elegibles como costal.
+  productosCostal?: { id: string; nombre: string; sku: string }[];
+  // En edición de un granel: su costal de origen (si ya está ligado) y cuánto
+  // granel hay abierto ahora mismo.
+  costalOrigen?: CostalOrigen | null;
+  stockGranelAbierto?: number;
 };
 
-export function ProductoForm({ categorias, producto, ubicaciones = [] }: Props) {
+export function ProductoForm({
+  categorias,
+  producto,
+  ubicaciones = [],
+  productosCostal = [],
+  costalOrigen = null,
+  stockGranelAbierto = 0,
+}: Props) {
   const isEdit = !!producto;
   const action = isEdit ? actualizarProductoAction : crearProductoAction;
   const [state, formAction] = useActionState(action, initial);
@@ -87,8 +108,16 @@ export function ProductoForm({ categorias, producto, ubicaciones = [] }: Props) 
     setGanancia(num(costo) > 0 ? r2(pctDe(num(v), num(costo))) : "");
   };
 
-  // Venta a granel (solo edición): abrir un empaque (costal) → producto granel.
-  const [granelOn, setGranelOn] = useState(!!producto?.productoGranelId);
+  // Venta a granel: este producto puede SER un costal que se abre, o VENDERSE a
+  // granel saliendo de un costal (camino inverso). Detectamos el modo inicial.
+  const [granelModo, setGranelModo] = useState<"ninguno" | "esGranel" | "esCostal">(
+    producto?.productoGranelId ? "esCostal" : costalOrigen ? "esGranel" : "ninguno",
+  );
+  // Costal de origen elegido cuando el producto se vende a granel ("" = ninguno,
+  // "__nuevo__" = crear uno nuevo, o el id de un producto existente).
+  const [costalSel, setCostalSel] = useState<string>(costalOrigen?.id ?? "");
+  // Unidad de este producto, en vivo, para etiquetar "¿cuánto trae un costal?".
+  const [unidadGranelActual, setUnidadGranelActual] = useState(producto?.unidadMedida ?? "PZA");
 
   // Si el producto traía una unidad libre que no está en la lista, la conservamos.
   const unidadActual = producto?.unidadMedida ?? "PZA";
@@ -188,6 +217,7 @@ export function ProductoForm({ categorias, producto, ubicaciones = [] }: Props) 
               id="unidadMedida"
               name="unidadMedida"
               defaultValue={unidadActual}
+              onChange={(e) => setUnidadGranelActual(e.target.value)}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             >
               {unidades.map((u) => (
@@ -322,24 +352,110 @@ export function ProductoForm({ categorias, producto, ubicaciones = [] }: Props) 
       </section>
 
       <section className="rounded-lg border bg-card p-5 space-y-4">
-          <h3 className="font-semibold">Venta a granel</h3>
-          <p className="text-xs text-muted-foreground">
-            Para productos que vienen en empaque (costal, caja) y abres para vender
-            suelto. Al activarlo se crea un producto
-            {producto?.nombre ? ` “${producto.nombre} (granel)”` : " “(granel)”"} con
-            su propio precio; luego usa “Abrir” en la lista de productos.
-          </p>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              name="granelActivo"
-              checked={granelOn}
-              onChange={(e) => setGranelOn(e.target.checked)}
-              className="size-4"
-            />
-            Este producto se abre para vender a granel
-          </label>
-          {granelOn && (
+        <h3 className="font-semibold">Venta a granel</h3>
+        <p className="text-xs text-muted-foreground">
+          Para vender suelto lo que viene en costal o caja (croquetas, arroz, frijol…).
+          El costal y el producto a granel quedan ligados: al “Abrir” un costal, su
+          contenido pasa al producto a granel.
+        </p>
+
+        <input type="hidden" name="granelModo" value={granelModo} />
+        <div>
+          <Label htmlFor="granelModo_sel">¿Este producto participa en venta a granel?</Label>
+          <select
+            id="granelModo_sel"
+            value={granelModo}
+            onChange={(e) => setGranelModo(e.target.value as typeof granelModo)}
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          >
+            <option value="ninguno">No</option>
+            <option value="esGranel">Sí — se vende a granel (sale de un costal)</option>
+            <option value="esCostal">Sí — es un costal que se abre</option>
+          </select>
+        </div>
+
+        {/* Camino granel → costal: este producto (ej. "kilo croquetas") sale de un costal. */}
+        {granelModo === "esGranel" && (
+          <div className="space-y-4 rounded-md border bg-muted/30 p-4">
+            {isEdit && (
+              <p className="text-xs text-muted-foreground">
+                {stockGranelAbierto > 0
+                  ? `Ahora mismo hay ${r2(stockGranelAbierto)} ${unidadGranelActual} abiertos listos para vender.`
+                  : "No hay producto a granel abierto todavía; abre un costal desde la lista de productos."}
+                {costalOrigen &&
+                  ` Costal de origen: ${costalOrigen.nombre} (${costalOrigen.stockCerrado} cerrados).`}
+              </p>
+            )}
+            <div>
+              <Label htmlFor="costalExistenteId">¿De qué costal sale?</Label>
+              <select
+                id="costalExistenteId"
+                name="costalExistenteId"
+                value={costalSel}
+                onChange={(e) => setCostalSel(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="">— Elige un costal —</option>
+                <option value="__nuevo__">➕ Crear costal nuevo</option>
+                {productosCostal.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nombre} ({p.sku})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {costalSel === "__nuevo__" && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="nuevoCostalNombre">Nombre del costal</Label>
+                  <Input
+                    id="nuevoCostalNombre"
+                    name="nuevoCostalNombre"
+                    placeholder="ej. Costal Croquetas Perrón 20 kg"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="nuevoCostalCosto">¿Cuánto te cuesta el costal?</Label>
+                  <Input
+                    id="nuevoCostalCosto"
+                    name="nuevoCostalCosto"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="sm:max-w-xs">
+              <Label htmlFor="granelContenido">
+                ¿Cuánto ({unidadGranelActual}) trae un costal?
+              </Label>
+              <Input
+                id="granelContenido"
+                name="granelContenido"
+                type="number"
+                step="0.001"
+                min="0"
+                inputMode="decimal"
+                defaultValue={costalOrigen?.contenido ?? ""}
+                placeholder="ej. 20"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Camino costal → granel: este producto ES el costal y crea su granel. */}
+        {granelModo === "esCostal" && (
+          <div className="space-y-4 rounded-md border bg-muted/30 p-4">
+            <p className="text-xs text-muted-foreground">
+              Se creará un producto
+              {producto?.nombre ? ` “${producto.nombre} (granel)”` : " “(granel)”"} con su
+              propio precio; luego usa “Abrir” en la lista de productos.
+            </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="contenidoGranel">¿Cuántas unidades sueltas trae un empaque?</Label>
@@ -370,8 +486,9 @@ export function ProductoForm({ categorias, producto, ubicaciones = [] }: Props) 
                 </select>
               </div>
             </div>
-          )}
-        </section>
+          </div>
+        )}
+      </section>
 
       {!isEdit && ubicaciones.length > 0 && (
         <section className="rounded-lg border bg-card p-5 space-y-4">
