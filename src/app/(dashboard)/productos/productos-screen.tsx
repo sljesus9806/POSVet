@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Tag, ArrowLeftRight, ScrollText, PackagePlus, PackageOpen, SlidersHorizontal, Pencil, Power, Trash2 } from "lucide-react";
+import { Plus, Tag, ScrollText, PackagePlus, PackageOpen, SlidersHorizontal, Pencil, Power, Trash2, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Modal } from "@/components/ui/modal";
 import {
   abrirEmpaqueAction,
@@ -128,9 +135,6 @@ export function ProductosScreen({
             <Link href="/productos/categorias"><Tag className="size-4" /> Categorías</Link>
           </Button>
           <Button variant="outline" size="sm" asChild>
-            <Link href="/inventario/transferencias"><ArrowLeftRight className="size-4" /> Transferencias</Link>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
             <Link href="/inventario/movimientos"><ScrollText className="size-4" /> Movimientos</Link>
           </Button>
           <Button size="sm" asChild>
@@ -226,37 +230,48 @@ export function ProductosScreen({
                   <TableCell className="text-right tabular-nums">{fmtMoneda(p.precioPublico)}</TableCell>
                   <TableCell className="text-right tabular-nums">{p.stockTotal} {p.unidadMedida}</TableCell>
                   <TableCell>
-                    <div className="flex items-center justify-end gap-1 flex-wrap">
-                      {puedeInventario && (
-                        <>
-                          <Button variant="outline" size="sm" className="h-8" onClick={() => setModal({ tipo: "stock", prod: p })}>
-                            <PackagePlus className="size-4" /> Stock
+                    <div className="flex justify-end">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" disabled={pending} title="Acciones">
+                            <MoreHorizontal className="size-4" />
+                            <span className="sr-only">Acciones de {p.nombre}</span>
                           </Button>
-                          <Button variant="ghost" size="sm" className="h-8" onClick={() => setModal({ tipo: "ajuste", prod: p })} title="Ajustar (merma, conteo…)">
-                            <SlidersHorizontal className="size-4" />
-                          </Button>
-                          {p.productoGranelId && (
-                            <Button variant="ghost" size="sm" className="h-8" onClick={() => setModal({ tipo: "abrir", prod: p })} title={`Abrir para vender a granel (${p.productoGranelNombre ?? "granel"})`}>
-                              <PackageOpen className="size-4" />
-                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-52">
+                          {puedeInventario && (
+                            <>
+                              <DropdownMenuItem onSelect={() => setModal({ tipo: "stock", prod: p })}>
+                                <PackagePlus className="size-4" /> Agregar stock
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onSelect={() => setModal({ tipo: "ajuste", prod: p })}>
+                                <SlidersHorizontal className="size-4" /> Ajustar (merma, conteo…)
+                              </DropdownMenuItem>
+                              {p.productoGranelId && (
+                                <DropdownMenuItem onSelect={() => setModal({ tipo: "abrir", prod: p })}>
+                                  <PackageOpen className="size-4" /> Abrir para granel
+                                </DropdownMenuItem>
+                              )}
+                            </>
                           )}
-                        </>
-                      )}
-                      {puedeEditar && (
-                        <Button variant="ghost" size="sm" className="h-8" asChild title="Editar">
-                          <Link href={`/productos/${p.id}`}><Pencil className="size-4" /></Link>
-                        </Button>
-                      )}
-                      {puedeEditar && (
-                        <Button variant="ghost" size="sm" className="h-8" onClick={() => cambiarActivo(p)} disabled={pending} title={p.activo ? "Ocultar" : "Reactivar"}>
-                          <Power className={`size-4 ${p.activo ? "" : "text-muted-foreground"}`} />
-                        </Button>
-                      )}
-                      {puedeEliminar && (
-                        <Button variant="ghost" size="sm" className="h-8" onClick={() => eliminar(p)} disabled={pending} title="Eliminar">
-                          <Trash2 className="size-4 text-destructive" />
-                        </Button>
-                      )}
+                          {puedeInventario && (puedeEditar || puedeEliminar) && <DropdownMenuSeparator />}
+                          {puedeEditar && (
+                            <DropdownMenuItem asChild>
+                              <Link href={`/productos/${p.id}`}><Pencil className="size-4" /> Editar</Link>
+                            </DropdownMenuItem>
+                          )}
+                          {puedeEditar && (
+                            <DropdownMenuItem onSelect={() => cambiarActivo(p)}>
+                              <Power className="size-4" /> {p.activo ? "Ocultar" : "Reactivar"}
+                            </DropdownMenuItem>
+                          )}
+                          {puedeEliminar && (
+                            <DropdownMenuItem onSelect={() => eliminar(p)} className="text-destructive focus:text-destructive">
+                              <Trash2 className="size-4" /> Eliminar
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </TableCell>
                 </TableRow>
